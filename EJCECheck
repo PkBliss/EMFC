@@ -1,0 +1,314 @@
+package com.elsevier;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.log4j.Logger;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.FileSystemXmlApplicationContext;
+import com.CETemplate;
+import com.model.CEBean;
+
+public class EJCECheck implements CETemplate{
+
+	
+	private static final Logger logger = Logger.getLogger(EJCECheck.class);
+	@Override
+	public String applyCECheck(String txtContent, CEBean ceObj)
+			throws IOException {
+
+		ApplicationContext ctx = new FileSystemXmlApplicationContext(ceObj.getJidxmlPath());
+		Map<String, String> jidMap = (Map<String, String>) ctx.getBean(ceObj.getJid().toUpperCase());
+		System.out.println(jidMap);
+		logger.info("CE Check Start here......");
+		
+		long startTime = System.currentTimeMillis();
+		
+		 
+		txtContent = FixedTypeCECheck(txtContent, ceObj, jidMap);  
+	 	txtContent = acceptRejectTypeCECheck(txtContent, ceObj, jidMap); 
+	  	txtContent = queryTypeCECheck(txtContent, ceObj, jidMap); 
+	  	txtContent = pseDescisionTypeCECheck(txtContent, ceObj, jidMap);
+		
+	 
+		long end = System.currentTimeMillis();
+
+		long startTimeInMillis = end - startTime;
+		
+		int s = (int) (startTimeInMillis / 1000);
+
+		logger.info("Time Consumed in CE Check : " + s + "seconds");
+
+		return txtContent;
+	}
+
+	@Override
+	public String FixedTypeCECheck(String txtContent, CEBean ceObj, Map<String, String> jidMap) throws IOException {
+		
+       FixedCeCheck fixedObj=new FixedCeCheck();
+       
+     //   txtContent = fixedObj.eg_Or_ie(txtContent);
+    
+   //    txtContent = fixedObj.figDotChecking(txtContent);
+       
+ //      txtContent = fixedObj.eg_Or_ie(txtContent); 
+       
+     //  txtContent = fixedObj.highlightTiming(txtContent); 
+       
+    //   txtContent = fixedObj.applyDotEndOfFigureCaption(txtContent,ceObj,jidMap);
+      
+  //     txtContent = fixedObj.changeTabToTable(txtContent);
+       
+    //   txtContent = fixedObj.changeEqToChem(txtContent);  
+       
+   //    txtContent = fixedObj.changeDisplayEquationToeq(txtContent);
+       
+       
+   //    txtContent = fixedObj.changeJrSuffixTag(txtContent);
+       
+   //   txtContent = fixedObj.jounalRefChangeArTandJTiToSenTi(txtContent);
+      
+    // txtContent = fixedObj.keywordAllowedInAlphabeticalOrder(txtContent);  // no do not working
+       
+  //     txtContent = fixedObj.footNoteSequence(txtContent);
+       
+  //     txtContent = fixedObj.articleTitle_SentenceCase(txtContent);  
+     
+   //    txtContent = fixedObj.changeNumberedHeadingToUnnumbered(txtContent,jidMap);   
+          
+   //    txtContent = fixedObj.setAbstractToSummary( txtContent, jidMap);
+       
+   //    txtContent = fixedObj.title_Section_To_Sentense_Section( txtContent);
+
+   //    txtContent = fixedObj.threeBinomial( txtContent); 
+       
+  //     txtContent = fixedObj.checkContentInEqMiTag( txtContent,jidMap);
+       
+    //   txtContent = fixedObj.checkContentInChem( txtContent,jidMap);
+       
+   //    txtContent = fixedObj.PHFromPH(txtContent);
+       
+  //     txtContent = fixedObj.checkVsandVersus(txtContent);
+      
+  //     txtContent = fixedObj.referenceToReferences(txtContent);
+       
+  //     txtContent = fixedObj.keyTokeysandkeysTokey(txtContent); 
+        
+   //    txtContent =fixedObj.sectionLinking(txtContent); 
+       
+  //     txtContent =fixedObj.checkSomeFixedWord(txtContent,jidMap);//like Microsoft excel should be Microsoft Excel
+       
+       /////////////////////////////////////////////////////////////////////////////////////////////
+              
+   //   txtContent =fixedObj.BinominalsNames(txtContent);  //path
+       
+    //  txtContent =fixedObj.binomilaToItalic(txtContent);  //path
+       
+     txtContent = fixedObj.getLatinTermsWordsInFinalContent(txtContent,jidMap); //path
+       
+       ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+       
+     // txtContent =fixedObj.SIUnits(txtContent); 
+       
+   //    txtContent =fixedObj.usstate_Name_toAbbrevated_Form(txtContent); 
+       
+      // txtContent =fixedObj.chapterTitleAndBookTitle(txtContent);
+       
+    //   txtContent =fixedObj.tabelLabelDot(txtContent);
+      
+       
+    //   txtContent =fixedObj.percentToSymbol(txtContent);
+     
+       
+     //  txtContent =fixedObj.hyphenToto(txtContent);
+       
+    //   txtContent =fixedObj.dotToColoninTime(txtContent);
+       
+     //  txtContent =fixedObj.CH3SHHyphenRemove(txtContent);
+       
+   //   txtContent =fixedObj.headingcheck(txtContent);
+       
+  //     txtContent =fixedObj.betweenTotoAnd(txtContent);
+       
+    //  txtContent =fixedObj.capsCheckinAllheading(txtContent);
+       
+   //    txtContent =fixedObj.doublequotesinlongestString(txtContent); 
+       
+      //  txtContent =fixedObj.frenchCityToEnglishCity(txtContent); 
+        
+            //txtContent =fixedObj.fullCitytoAbbrCity(txtContent);  
+       
+        //txtContent =fixedObj.fullJtitleToAbbrJtitle(txtContent);
+       
+ //      txtContent =fixedObj.tableStrongdataCaps(txtContent);  /// noooooooo
+       
+     //  txtContent =fixedObj.ArcSecORMinToSymbolconverter(txtContent); 
+       
+   //    txtContent =fixedObj.keywordsToSentenceCase(txtContent); 
+       logger.info("ArcSecORMinToSymbolconverter method completed");
+   //  txtContent =fixedObj.testingkeywordsort(txtContent);
+    //   logger.info("keywordsToSentenceCase method completed"); 
+       
+     //  txtContent =fixedObj.HnmrCnmrHyphenremove(txtContent); 
+       //txtContent =fixedObj.FromNdashtoTo(txtContent); 
+      // txtContent =fixedObj.jtitletoTitlecase(txtContent); 
+       //txtContent =fixedObj.mlandmL (txtContent); 
+       //txtContent =fixedObj.GC_MS_EC_FABtondash (txtContent); 
+     //  txtContent =fixedObj.thinspaceinAMPM (txtContent);
+//txtContent =fixedObj.authnameorderedRef(txtContent); 
+ //txtContent =fixedObj.sameyearsepDif(txtContent); 
+   //txtContent =fixedObj.sameyearDifPat(txtContent); 
+     
+   // txtContent =fixedObj.testingnamesort(txtContent);
+     //txtContent =fixedObj.citRef (txtContent); 
+
+       
+       
+       
+       return txtContent;
+	}
+
+	@Override
+	public String acceptRejectTypeCECheck(String txtContent, CEBean ceObj, Map<String, String> jidMap) {
+		// TODO Auto-generated method stub
+		AcceptNRejectCeCheck acceptRejectObj=new AcceptNRejectCeCheck();
+		
+	 //	 txtContent = acceptRejectObj.tableFirstLetterCapital(txtContent); 
+		txtContent = acceptRejectObj.thousandSeperator_Remover (txtContent); 
+	//	txtContent = acceptRejectObj.decimal_point_checking (txtContent); 
+		txtContent = acceptRejectObj.replace_nOe (txtContent); 
+		txtContent = acceptRejectObj.changeLambda (txtContent); 
+		txtContent = acceptRejectObj.dSmallCaps (txtContent);  
+	//	txtContent = acceptRejectObj.removeNdashBetweenDigit (txtContent); 
+	//	txtContent = acceptRejectObj.removeNdashFromDigit (txtContent); 
+		txtContent = acceptRejectObj.DegRemovefrmKelvin (txtContent);
+		txtContent = acceptRejectObj.samewordhyphentoendash (txtContent);
+	//	txtContent = acceptRejectObj.replace_Hyphen_To_EnRules(txtContent);//take more time
+ 	//	txtContent = acceptRejectObj.H_NMRHypenRemover(txtContent); 
+		 
+		return txtContent;
+	}
+
+	
+	@Override
+	public String queryTypeCECheck(String txtContent, CEBean ceObj, Map<String, String> jidMap) {
+		
+		QueryCeCheck queryObj=new  QueryCeCheck();
+		
+  	    txtContent= queryObj.checkKeyword(txtContent, ceObj, jidMap);
+		
+//		txtContent =queryObj.floatElementMustbeLinked(txtContent, ceObj, jidMap);
+		
+	//	txtContent= queryObj.checkHistory(txtContent, ceObj, jidMap);
+		
+	//	txtContent =queryObj.checkReferencesStyle(txtContent, ceObj, jidMap);
+		
+//		txtContent= queryObj.checkHeadingforDotWords(txtContent, ceObj, jidMap);
+		
+//		txtContent =queryObj.checkFloatInSequence(txtContent, ceObj, jidMap); 
+
+	//	txtContent= queryObj.litreMajoritycheck(txtContent);**
+
+	//	txtContent =queryObj.checkSameReferenceCitationWithDifferentPublicationYear(txtContent, ceObj, jidMap);
+
+	//	txtContent= queryObj.eqimgdisplayednewline(txtContent);
+		
+		//txtContent =queryObj.chemicalNameValidator(txtContent); //need example then modifyt it.
+		
+		//txtContent= queryObj.capsLetterAfterDot (txtContent); 
+	
+	//	txtContent =queryObj.referencePunctuationBeforeCitation (txtContent);
+		 		
+	//	txtContent= queryObj.validateColonStyle (txtContent);
+		 
+		//txtContent =queryObj.spaceRemoverBwPercentage (txtContent);**
+		
+//		txtContent= queryObj.validateSpaceNdashBetweenNumbers (txtContent); 
+ 
+	//	txtContent=queryObj.greekDelta(txtContent); 
+		
+	//	txtContent= queryObj.doublePunctuation (txtContent);
+		
+	//	txtContent =queryObj.validatecounterycode (txtContent);****
+		
+	//	txtContent= queryObj.makeItalicMultisymbolg (txtContent);****
+	
+	//	txtContent =queryObj.spaceisAfterAndBeforeThinSpace (txtContent);
+		
+	//	txtContent= queryObj.citedreferenceBeforeCitation (txtContent);**
+		
+	//	txtContent =queryObj.validateAffilationforcountryname (txtContent);**
+		
+	//	txtContent= queryObj.warningInPlaceCommaToAnd (txtContent);
+		
+	//	txtContent =queryObj.coltdcomma (txtContent);
+		
+	//	txtContent= queryObj.spacebetnoandgreekletter (txtContent);
+		
+	//	txtContent =queryObj.theBeforeEq (txtContent);
+		
+	//	txtContent= queryObj.lnandopeningparenthesis (txtContent);
+		
+	//	txtContent =queryObj.tablescitedwordTable (txtContent);
+		
+	//	txtContent= queryObj.warnForRepitativeUnit (txtContent);
+
+//		txtContent =queryObj.spaceismissingbwetweendegandunit (txtContent);
+		
+	//	txtContent= queryObj.corrplusspace (txtContent); 
+		
+	//	txtContent=queryObj.authoremaillinked (txtContent);
+		
+  //  	txtContent =queryObj.pspaceafterdotauname (txtContent);
+  
+	//	txtContent=queryObj.checkHeadingStyle(txtContent, ceObj, jidMap);
+		
+	//	txtContent=queryObj.checkFirstNLastPageInReference(txtContent,jidMap);
+		
+	//	txtContent=queryObj.checkMinusBeforeNumber(txtContent,jidMap);
+		
+//		txtContent=queryObj.checkSpaceBetweenFloatElementsNnumber(txtContent,jidMap);
+		
+	//	txtContent=queryObj.checkPHValue(txtContent,jidMap);
+		
+	//	txtContent=queryObj.checkSpaceBeforeMinus(txtContent,jidMap);
+		
+	//	txtContent=queryObj.checkSpaceBetweenInNOpeningBracket(txtContent,jidMap);
+		
+	//	txtContent=queryObj.checkZeroIssueVolume(txtContent,jidMap);
+		
+	//	txtContent=queryObj.checkPartReferenceLinking(txtContent);
+		
+	//	txtContent=queryObj.checkColumnAlignment(txtContent); noooooooooooo
+		
+	//	txtContent = queryObj.abstract_Floating_Citation_Query(txtContent);** 
+		
+	//	txtContent = queryObj.style5( txtContent,jidMap);   no need to use it.
+		
+	//	txtContent = queryObj.authorAddress_Not_Email(txtContent);***
+		
+	//	txtContent = queryObj.SIUnits2query(txtContent);  no000000000000000000000
+
+		
+		
+	       
+		
+		
+		
+		// TODO Auto-generated method stub
+		return txtContent;
+	}
+
+	@Override
+	public String pseDescisionTypeCECheck(String txtContent, CEBean ceObj, Map<String, String> jidMap) {
+		// TODO Auto-generated method stub
+		return txtContent;
+	}
+
+	
+	
+
+}
