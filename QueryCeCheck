@@ -1,0 +1,2104 @@
+package com.elsevier;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.lang3.StringUtils;
+import org.hibernate.Query;
+import org.hibernate.Session;
+
+import com.config.CrossLinkingElements;
+import com.config.UtilSingleton;
+import com.dao.DBConnectionProvider;
+import com.model.CEBean;
+
+public class QueryCeCheck {
+	private static int queryId=1;
+
+	/** Purpose of method is to check no of keyword allowed for this journal from jidxml file
+	 * if found out of range generate query
+	 * @param content
+	 * @param ceObj
+	 * @param jidMap
+	 * @return String
+	 */
+	public String checkKeyword(String content, CEBean ceObj,
+			Map<String, String> jidMap) {
+
+		String keywordount = jidMap.get("noofkeyword");
+		int keyMin = 0;
+		int keyMax = 0;
+		if (keywordount != null && keywordount.contains(",")) {
+			String kewordRange[] = keywordount.split(",");
+			keyMin = Integer.parseInt(kewordRange[0]);
+			keyMax = Integer.parseInt(kewordRange[1]);
+		}
+
+		Pattern keyCheckPat = Pattern.compile("<p( id=\"([a-zA-Z_0-9]+)\")? class=\"kwd\" role=\"keyword\">(.*?)</p>");
+		Matcher keyCheckMat = keyCheckPat.matcher(content);
+		StringBuffer sb = new StringBuffer();
+		if (keyCheckMat.find()) {
+			System.out.println(keyCheckMat.group(3));
+			int keyCount = StringUtils.countMatches(keyCheckMat.group(0),"<span class=\"keyword\">");
+			String grp1 = keyCheckMat.group(0);
+		 	if (grp1 != null && grp1.contains("<span class=\"keyword\">")&& keywordount != null && !(keyCount < keyMin && keyCount > keyMax)) {
+		 		content = content.replaceFirst(keyCheckMat.group(3),"<span class=\"keyword\"><span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Only"
+										+  keywordount.replace(",", "-")
+										+ " keywords are allowed for journal "
+										+ ceObj.getJid()+ "&lt;/query&gt;--&gt;"+""+"</span></span>"+keyCheckMat.group(3));
+			}
+		}
+	//	 System.out.println(content);
+		return content;
+	
+	}
+	
+	/**
+	 * Purpose of method is to check all float elements citation ,callout and label existence
+	 * @param editorContent
+	 * @param ceObj
+	 * @param jidMap
+	 * @return
+	 */
+	public String floatElementMustbeLinked(String editorContent, CEBean ceObj,
+			Map jidMap) {
+
+		CrossLinkingElements crossLinkingEle = new CrossLinkingElements();
+		Pattern xps_afloatlinkingpattern = Pattern.compile(
+				"<span class=\"xps_afloatlinking\">(.*?)</span>",
+				Pattern.CASE_INSENSITIVE);
+		Pattern xps_floatlinkingpattern = Pattern
+				.compile(
+						"<span class=\"xps_floatlinking\">((Figure|figure|FIGURE|fig|Fig|FIG|Figura|figura|Abb|Abbildung|Tabela|Tabelle|Tableau|TABLEAU|table|tabela|Table|Tabla|TABLE|tab|Tab|TAB|box|video|schematic|scheme|plate|photo|exhibit|illustrator|picture|tree|diagram|chart|code example|command line example|graphic|graph)(s)?(\\.)?\\s?(([0-9]+)?[a-z]*\\.?[0-9ixv]+[a-z]?+(\\s?(e|et|and|und|(<span class=\"xps_ndash\">&#8211;</span>|,))\\s?([0-9]+)?[a-z]*\\.?[0-9ixv]+[a-z]?+)?))</span>",
+						Pattern.CASE_INSENSITIVE);
+		Pattern label_pattern = Pattern
+				.compile(
+						"<p( id=\"([a-zA-Z_0-9]+)\")? class=\"(fig|tab)\"( role=\"[a-zA-Z0-9]+\")?( id=\"([a-zA-Z_0-9]+)\")?><span class=\"xps_label\">((Figure|figure|FIGURE|fig|Fig|FIG|Figura|figura|Abb|Abbildung|Tabela|Tabelle|Tableau|TABLEAU|table|tabela|Table|Tabla|TABLE|tab|Tab|TAB|box|video|schematic|scheme|plate|photo|exhibit|illustrator|picture|tree|diagram|chart|code example|command line example|graphic|graph)(s)?(\\.)?\\s?([0-9]+[a-z]*\\.?[0-9ixv]*[a-z]?+))</span>(.*?)</p>",
+						Pattern.CASE_INSENSITIVE);
+
+		Pattern anchorPattern = Pattern
+				.compile(
+						"((Figure|figure|FIGURE|fig|Fig|FIG|Figura|figura|Abb|Abbildung|Tabela|Tabelle|Tableau|TABLEAU|table|tabela|Table|Tabla|TABLE|tab|Tab|TAB|box|video|schematic|scheme|plate|photo|exhibit|illustrator|picture|tree|diagram|chart|code example|command line example|graphic|graph)(\\.)?\\s?([0-9]+[a-z]*\\.?[0-9ixv]*[a-z]?+)(,\\s)?)",
+						Pattern.CASE_INSENSITIVE);
+
+		Matcher afloatMatcher = xps_afloatlinkingpattern.matcher(editorContent);
+		Matcher floatMatcher = xps_floatlinkingpattern.matcher(editorContent);
+		Matcher labelMatcher = label_pattern.matcher(editorContent);
+
+		Map<String, String> labelMap = new HashMap<String, String>();
+
+		List<String> floatList = new ArrayList<String>();
+		List<String> afloatList = new ArrayList<String>();
+
+		List<String> OriginalFloatList = new ArrayList<String>();
+		List<String> originalAnchorList = new ArrayList<String>();
+
+		String orig = null;
+		String aorig = null;
+		// Adds all float elements label in labellist
+		while (labelMatcher.find()) {
+
+			StringBuilder genericLabel = new StringBuilder();
+
+			String gr6 = crossLinkingEle
+					.getProperEnumEle(labelMatcher.group(8));
+
+			String gr9 = labelMatcher.group(11);
+
+			genericLabel.append(crossLinkingEle.getProperEnumEle(gr6))
+					.append(" ").append(StringUtils.strip(gr9, "\\."));
+
+			labelMap.put(labelMatcher.group(7), genericLabel.toString());
+
+		}
+
+		// adds all anchor in anchorList
+		while (afloatMatcher.find()) {
+
+			String gr1 = afloatMatcher.group(1);
+
+			if (gr1.contains(", ")) {
+
+				String[] str = gr1.split(", ");
+
+				for (String temp : str) {
+
+					Matcher anchorMatcher = anchorPattern.matcher(temp);
+
+					while (anchorMatcher.find()) {
+
+						String gr2 = anchorMatcher.group(2);
+						String gr3 = anchorMatcher.group(3);
+						String gr4 = anchorMatcher.group(4);
+
+						StringBuilder genericLabel = new StringBuilder();
+						genericLabel
+								.append(crossLinkingEle.getProperEnumEle(gr2))
+								.append(" ").append(gr4);
+						if (gr3 != null) {
+							orig = gr2 + gr3 + " " + gr4;
+						} else {
+							orig = gr2 + " " + gr4;
+						}
+
+						if (!originalAnchorList.contains(orig)) {
+
+							originalAnchorList.add(orig);
+						}
+
+						if (!afloatList
+								.contains(genericLabel.toString().trim()))
+							afloatList.add(genericLabel.toString().trim());
+					}
+				}
+			} else {
+
+				Matcher anchorMatcher = anchorPattern.matcher(gr1);
+
+				while (anchorMatcher.find()) {
+
+					String gr2 = anchorMatcher.group(2);
+					String gr4 = anchorMatcher.group(4);
+					String gr3 = anchorMatcher.group(3);
+					if (gr3 != null) {
+						orig = gr2 + gr3 + " " + gr4;
+					} else {
+						orig = gr2 + " " + gr4;
+					}
+					StringBuilder genericLabel = new StringBuilder();
+					genericLabel.append(crossLinkingEle.getProperEnumEle(gr2))
+							.append(" ").append(gr4);
+
+					if (!originalAnchorList.contains(orig)) {
+
+						originalAnchorList.add(orig);
+					}
+
+					if (!afloatList.contains(genericLabel.toString().trim()))
+						afloatList.add(genericLabel.toString().trim());
+				}
+			}
+		}
+		// Adds all crosslinking in floatList
+		while (floatMatcher.find()) {
+
+			String gr1 = floatMatcher.group(1);
+			String gr2 = floatMatcher.group(2);
+			String gr4 = floatMatcher.group(4);
+			String gr5 = floatMatcher.group(5);
+
+			if (floatMatcher.group(8) != null) {
+
+				if (floatMatcher.group(8).equalsIgnoreCase(
+						"<span class=\"xps_ndash\">&#8211;</span>")) {
+					String start = "";
+					String end = "";
+					String[] labelArray = gr5.split(floatMatcher.group(8));
+					if (labelArray[0].matches("([0-9][a-zA-Z])")) {
+						start = labelArray[0].substring(1,
+								labelArray[0].length());
+						start = String.valueOf((start.charAt(0)) - 96);
+					} else if (labelArray[0].matches("([a-zA-Z][0-9])")) {
+						start = labelArray[0].substring(1,
+								labelArray[0].length());
+						// start = String.valueOf((start.charAt(0))-96);
+
+					} else {
+						start = labelArray[0];
+					}
+					if (labelArray[1].matches("([0-9][a-zA-Z])")) {
+						end = labelArray[1]
+								.substring(1, labelArray[1].length());
+						end = String.valueOf((end.charAt(0)) - 96);
+					} else if (labelArray[1].matches("([a-zA-Z][0-9])")) {
+						end = labelArray[1]
+								.substring(1, labelArray[1].length());
+						// end = String.valueOf((end.charAt(0))-96);
+					} else {
+						end = labelArray[1];
+					}
+					for (int startIndex = Integer.parseInt(start); startIndex <= Integer
+							.parseInt(end); startIndex++) {
+						StringBuilder genericLabel = new StringBuilder();
+						if (labelArray[0].matches("([0-9][a-zA-Z])")) {
+							genericLabel
+									.append(crossLinkingEle
+											.getProperEnumEle(gr2))
+									.append(" ")
+									.append(labelArray[0].substring(0, 1)
+											+ com.config.DataTypeConversion
+													.getLowercaseCharOfStringNumber(startIndex
+															+ ""));
+
+							if (!OriginalFloatList
+									.contains(gr2
+											+ " "
+											+ labelArray[0].substring(0, 1)
+											+ com.config.DataTypeConversion
+													.getLowercaseCharOfStringNumber(startIndex
+															+ ""))) {
+
+								OriginalFloatList
+										.add(gr2
+												+ " "
+												+ labelArray[0].substring(0, 1)
+												+ com.config.DataTypeConversion
+														.getLowercaseCharOfStringNumber(startIndex
+																+ ""));
+							}
+
+							if (!floatList.contains(genericLabel.toString()
+									.trim()))
+								floatList.add(genericLabel.toString().trim());
+						} else if (labelArray[0].matches("([a-zA-Z][0-9])")) {
+							genericLabel
+									.append(crossLinkingEle
+											.getProperEnumEle(gr2))
+									.append(" ")
+									.append(labelArray[0].substring(0, 1)
+											+ startIndex + "");
+
+							if (!OriginalFloatList.contains(gr2 + " "
+									+ labelArray[0].substring(0, 1)
+									+ startIndex + "")) {
+
+								OriginalFloatList.add(gr2 + " "
+										+ labelArray[0].substring(0, 1)
+										+ startIndex + "");
+							}
+
+							if (!floatList.contains(genericLabel.toString()
+									.trim()))
+								floatList.add(genericLabel.toString().trim());
+						} else {
+							genericLabel
+									.append(crossLinkingEle
+											.getProperEnumEle(gr2)).append(" ")
+									.append(startIndex);
+
+							if (!OriginalFloatList
+									.contains(gr2
+											+ " "
+											+ labelArray[0].substring(0, 1)
+											+ com.config.DataTypeConversion
+													.getLowercaseCharOfStringNumber(startIndex
+															+ "")))
+								;
+							{
+
+								OriginalFloatList
+										.add(gr2
+												+ " "
+												+ labelArray[0].substring(0, 1)
+												+ com.config.DataTypeConversion
+														.getLowercaseCharOfStringNumber(startIndex
+																+ ""));
+							}
+
+							if (!floatList.contains(genericLabel.toString()
+									.trim()))
+								floatList.add(genericLabel.toString().trim());
+						}
+					}
+				} else {
+					String[] str = gr1.split(floatMatcher.group(8));
+					for (String temp : str) {
+						StringBuilder genericLabel = new StringBuilder();
+						if (temp.contains(gr2)) {
+							genericLabel
+									.append(crossLinkingEle
+											.getProperEnumEle(gr2))
+									.append(" ")
+									.append(gr5.substring(0,
+											gr5.indexOf(floatMatcher.group(8))));
+
+							if (!OriginalFloatList
+									.contains(gr2
+											+ " "
+											+ gr5.substring(0, gr5
+													.indexOf(floatMatcher
+															.group(8))))) {
+
+								OriginalFloatList
+										.add(gr2
+												+ " "
+												+ gr5.substring(0, gr5
+														.indexOf(floatMatcher
+																.group(8))));
+							}
+							if (!floatList.contains(genericLabel.toString()
+									.trim()))
+								floatList.add(genericLabel.toString().trim());
+						} else {
+							genericLabel
+									.append(crossLinkingEle
+											.getProperEnumEle(gr2)).append(" ")
+									.append(temp.trim());
+							if (!floatList.contains(genericLabel.toString()
+									.trim()))
+								floatList.add(genericLabel.toString().trim());
+						}
+					}
+				}
+			} else {
+				StringBuilder genericLabel = new StringBuilder();
+				genericLabel.append(crossLinkingEle.getProperEnumEle(gr2))
+						.append(" ").append(gr5);
+
+				if (gr4 != null) {
+					aorig = gr2 + gr4 + " " + gr5;
+				} else {
+					aorig = gr2 + " " + gr5;
+				}
+				if (!OriginalFloatList.contains(aorig)) {
+
+					OriginalFloatList.add(aorig);
+				}
+				if (!floatList.contains(genericLabel.toString().trim()))
+					floatList.add(genericLabel.toString().trim());
+			}
+		}
+
+		// It checks if float is present but label is missing
+		if (OriginalFloatList != null) {
+			Iterator<String> iterator = OriginalFloatList.iterator();
+			while (iterator.hasNext()) {
+
+				String floatElement = iterator.next();
+				if (!labelMap.containsKey(floatElement)) {
+					editorContent = editorContent
+							.replace(
+									"<span class=\"xps_floatlinking\">"
+											+ floatElement + "</span>",
+									"<span class=\"xps_floatlinking\">"
+											+ floatElement
+											+ "</span><span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;Label is missing for float element "
+											+ floatElement
+											+ "&lt;/query&gt;--&gt;</span></span>");
+				}
+
+			}
+
+		}
+
+		// It checks if anchor is present but label is missing
+		if (originalAnchorList != null) {
+			Iterator<String> iterator = originalAnchorList.iterator();
+			while (iterator.hasNext()) {
+
+				String anchorElement = iterator.next();
+				if (!labelMap.containsKey(anchorElement)) {
+					editorContent = editorContent
+							.replace(
+									"<span class=\"xps_afloatlinking\">"
+											+ anchorElement + "</span>",
+									"<span class=\"xps_afloatlinking\">"
+											+ anchorElement
+											+ "</span><span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;Label is missing for anchor element "
+											+ anchorElement
+											+ "&lt;/query&gt;--&gt;</span></span>");
+				}
+
+			}
+
+		}
+
+		// It checks the crosslinking of all floating elements.
+		if (labelMap.size() > 0) {
+
+			Iterator iterator = labelMap.entrySet().iterator();
+			boolean isCrossLink = false;
+			boolean isAnchor = false;
+			while (iterator.hasNext()) {
+
+				Map.Entry mapEntry = (Map.Entry) iterator.next();
+
+				if (floatList != null
+						&& !floatList.contains(mapEntry.getValue())) {
+					isCrossLink = true;
+				}
+				if (afloatList != null
+						&& !afloatList.contains(mapEntry.getValue())) {
+					isAnchor = true;
+				}
+
+				if (isCrossLink && isAnchor) {
+
+					editorContent = editorContent
+							.replace(
+									"<span class=\"xps_label\">"
+											+ mapEntry.getKey() + "</span>",
+									"<span class=\"xps_label\">"
+											+ mapEntry.getKey()
+											+ "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;Crosslinking and anchor are not present for  "
+											+ mapEntry.getValue()
+											+ "&lt;/query&gt;--&gt;</span></span></span>");
+					isAnchor = false;
+					isCrossLink = false;
+
+				}
+				if (isCrossLink && !isAnchor) {
+					editorContent = editorContent
+							.replace(
+									"<span class=\"xps_label\">"
+											+ mapEntry.getKey() + "</span>",
+									"<span class=\"xps_label\">"
+											+ mapEntry.getKey()
+											+ "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;Crosslinking is not present for  "
+											+ mapEntry.getValue()
+											+ "&lt;/query&gt;--&gt;</span></span></span>");
+					isCrossLink = false;
+				}
+				if (isAnchor && !isCrossLink) {
+					editorContent = editorContent
+							.replace(
+									"<span class=\"xps_label\">"
+											+ mapEntry.getKey() + "</span>",
+									"<span class=\"xps_label\">"
+											+ mapEntry.getKey()
+											+ "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;Anchor is not present for  "
+											+ mapEntry.getValue()
+											+ "&lt;/query&gt;--&gt;</span></span></span>");
+					isAnchor = false;
+				}
+			}
+		}
+
+		return editorContent;
+	}
+
+	/**
+	 * Purpose of method is to check all float crosslinking and anchor sequence
+	 * @param content
+	 * @param ceObj
+	 * @param jidMap
+	 * @return
+	 */
+	public String checkFloatInSequence(String content, CEBean ceObj,
+			Map<String, String> jidMap) {
+
+		Pattern anchorPat = Pattern.compile(
+				"<span class=\"xps_afloatlinking\">(.*?)</span>",
+				Pattern.CASE_INSENSITIVE);
+		Matcher anchorMat = anchorPat.matcher(content);
+		LinkedHashMap<String, String> fighsmap = new LinkedHashMap();
+		LinkedHashMap<String, String> tabhsmap = new LinkedHashMap();
+		LinkedHashMap<String, String> schemahsmap = new LinkedHashMap();
+		int f = 0;
+		int t = 0;
+		int s = 0;
+		while (anchorMat.find()) {
+
+			String grp1 = anchorMat.group(1);
+			if (grp1 != null && grp1.toLowerCase().startsWith("fig")) {
+				fighsmap.put(grp1, grp1);
+			}
+			if (grp1 != null && grp1.toLowerCase().startsWith("tab")) {
+				tabhsmap.put(grp1, grp1);
+			}
+			if (grp1 != null && grp1.toLowerCase().startsWith("sche")) {
+				schemahsmap.put(grp1, grp1);
+			}
+		}
+		Iterator figiterator = fighsmap.entrySet().iterator();
+		Iterator tabiterator = tabhsmap.entrySet().iterator();
+		Iterator schemaiterator = schemahsmap.entrySet().iterator();
+
+		while (figiterator.hasNext()) {
+
+			Map.Entry mapEntry = (Map.Entry) figiterator.next();
+			String key = (String) mapEntry.getKey();
+
+			if (key != null
+					&& !key.trim().endsWith(new Integer(++f).toString())) {
+				content = content
+						.replace(
+								"<span class=\"xps_afloatlinking\">" + key
+										+ "</span>",
+								"<span class=\"xps_afloatlinking\">"
+										+ key
+										+ "</span><span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;Float Element  is not in sequence  &lt;/query&gt;--&gt;</span></span>");
+				break;
+			}
+		}
+
+		while (tabiterator.hasNext()) {
+
+			Map.Entry mapEntry = (Map.Entry) tabiterator.next();
+			String key = (String) mapEntry.getKey();
+
+			if (key != null && !key.endsWith(new Integer(++t).toString())) {
+				content = content
+						.replace(
+								"<span class=\"xps_afloatlinking\">" + key
+										+ "</span>",
+								"<span class=\"xps_afloatlinking\">"
+										+ key
+										+ "</span><span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;Float Element  is not in sequence  &lt;/query&gt;--&gt;</span></span>");
+				break;
+			}
+		}
+
+		while (schemaiterator.hasNext()) {
+
+			Map.Entry mapEntry = (Map.Entry) schemaiterator.next();
+			String key = (String) mapEntry.getKey();
+
+			if (key != null && !key.endsWith(new Integer(++s).toString())) {
+				content = content
+						.replace(
+								"<span class=\"xps_afloatlinking\">" + key
+										+ "</span>",
+								"<span class=\"xps_afloatlinking\">"
+										+ key
+										+ "</span><span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;Float Element  is not in sequence  &lt;/query&gt;--&gt;</span></span>");
+				break;
+			}
+		}
+
+		return content;
+	}
+
+	/**
+	 * Purpose of method is to check citation of same raference author with different publication year
+	 * @param content
+	 * @param ceObj
+	 * @param jidMap
+	 * @return String
+	 */
+	public String checkSameReferenceCitationWithDifferentPublicationYear(
+			String content, CEBean ceObj, Map<String, String> jidMap) {
+
+		Pattern refPat = Pattern.compile(
+				"<span class=\"xps_ndreflinking\">(.*?)</span>",
+				Pattern.CASE_INSENSITIVE);
+		Matcher refMat = refPat.matcher(content);
+		Pattern multiAuthorPat = Pattern
+				.compile("([a-zA-Z\\.' &amp;,]+), ([0-9]{0,4})");
+
+		while (refMat.find()) {
+
+			String grp1 = refMat.group(1);
+			if (grp1 != null && grp1.contains(";")) {
+				Matcher authMat = multiAuthorPat.matcher(grp1);
+				StringBuffer sb = new StringBuffer();
+				while (authMat.find()) {
+
+					String g1 = authMat.group(1);
+					int count = StringUtils.countMatches(grp1, g1.trim());
+					if (count > 1) {
+						authMat.appendReplacement(
+								sb,
+								authMat.group(0)
+										.replace(
+												authMat.group(1),
+												authMat.group(1)
+														+ "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;Same author with different publication year occur  &lt;/query&gt;--&gt;</span></span>"));
+					}
+
+				}
+				authMat.appendTail(sb);
+				content = content.replace(grp1, sb.toString());
+			}
+
+		}
+
+		return content;
+	}
+
+	/**
+	 * Purpose of method is to check allowed history for this journal
+	 * if not foung generate query
+	 * @param content
+	 * @param ceObj
+	 * @param jidMap
+	 * @return
+	 */
+	public String checkHistory(String content, CEBean ceObj,
+			Map<String, String> jidMap) {
+		String historydata = jidMap.get("history");
+		String received="",revised="",accepted="";
+		String data = "";
+		String grp5="";
+		String[] splitdata;
+		 System.out.println(historydata);
+		 Pattern historyPat = Pattern.compile("[0-9]+");
+			Matcher historyMat = historyPat.matcher(historydata);
+		if(historyMat.find()){
+			 data=historyMat.group().trim(); 
+		}
+		if(data!=null || data!="" ||data!=" "){
+			splitdata=data.split("");
+			received=splitdata[1];
+			revised=splitdata[2];
+			accepted=splitdata[3];
+		}
+		System.out.println(received+"------"+revised+"------"+accepted);
+		System.out.println();  
+		StringBuffer sb = new StringBuffer(); 
+		String recmsg="",revmsg="",acmsg="";
+        Pattern historyCheckPat = Pattern.compile("<p( id=\"([a-zA-Z_0-9]+)\")? class=\"history\"( id=\"([a-zA-Z_0-9]+)\")?>(.*?)</p>");
+			Matcher historyCheckMat = historyCheckPat.matcher(content);
+			if (historyCheckMat.find()) { 
+				grp5 = historyCheckMat.group(5);
+				System.out.println(grp5); 
+			}
+	if(grp5.contains("Received")){
+			if(received.equals("0")){ 
+				recmsg="Received Option not selected, ";
+				}else if(received.equals("1")){
+					recmsg="Received Do not use even if supplied, ";
+				}else if(received.equals("4")){
+					recmsg="Received Other see comments, ";
+				}
+		}else{
+			if(received.equals("0")){ 
+						recmsg="Received Option not selected, ";
+					}else if(received.equals("3")){
+						recmsg="Received Query JM if NOT supplied, ";
+					}else if(received.equals("4")){
+						recmsg="Received Other see comments, ";
+					}
+				}
+	if(grp5.contains("Revised")){
+		if(revised.equals("0")){ 
+			revmsg="Revised Option not selected, ";
+		}else if(revised.equals("1")){
+			revmsg="Revised Do not use even if supplied, ";
+		}else if(revised.equals("4")){
+			revmsg="Revised Other see comments, ";
+		}
+		 }else{
+			 if(revised.equals("0")){ 
+				 revmsg="Revised Option not selected, ";
+				}else if(revised.equals("3")){
+					revmsg="Revised Query JM if NOT supplied, ";
+				}else if(revised.equals("4")){
+					revmsg="Revised Other see comments, ";
+				}
+		 }
+	if(grp5.contains("Accepted")){
+		if(accepted.equals("0")){ 
+			acmsg="Accepted Option not selected, ";
+		}else if(accepted.equals("1")){
+			acmsg="Accepted Do not use even if supplied, ";
+		}else if(accepted.equals("4")){
+			acmsg="Accepted Other see comments, ";
+		}
+		   }else{
+					if(accepted.equals("0")){ 
+						acmsg="Accepted Option not selected, ";
+					}else if(accepted.equals("3")){
+						acmsg="Accepted Query JM if NOT supplied, ";
+					}else if(accepted.equals("4")){
+						acmsg="Accepted Other see comments, ";
+					}
+				}
+	String message="";
+				if(!(recmsg.equals("") && revmsg.equals("") &&  acmsg.equals("") ))
+				{
+	sb.append(recmsg+""+revmsg+""+acmsg+" kindly check it.");
+	message="<span class=\"mceNonEditable\"><span id=\"QRY0\" class=\"QRY0\">&lt;!--&lt;query&gt;"+sb.toString()+"&lt;/query&gt;--&gt;</span></span>";
+				}
+	
+	System.out.println(sb.length());
+	
+
+System.out.println(message);
+		
+			 Pattern historyCheckp = Pattern.compile("<p( id=\"([a-zA-Z_0-9]+)\")? class=\"history\"( id=\"([a-zA-Z_0-9]+)\")?>(.*?)</p>");
+				Matcher historyCheckm = historyCheckp.matcher(content);
+				if (historyCheckm.find()) { 
+					content=content.replace(historyCheckm.group(0), historyCheckm.group(0).replace(historyCheckm.group(5), message+""+historyCheckm.group(5)));
+				 }
+				
+				System.out.println(content);
+		return null;
+	}
+
+	/**
+	 * Purpose of method is to check reference style given in jidxml and editor content
+	 * if both are not same generate query
+	 * @param tx1FileContent
+	 * @param ceObj
+	 * @param jidMap
+	 * @return
+	 */
+	public String checkReferencesStyle(String tx1FileContent, CEBean ceObj, Map<String, String> jidMap) {
+
+		/*
+		 * Changing figure caption and label first.
+		 */
+		Pattern refLblPattern = Pattern
+				.compile("<p id=\"([a-zA-Z_0-9]+)\"><span class=\"ref_lbl\">(.*?)</span>");
+		Pattern numRefPat = Pattern.compile("(\\[?[0-9]+\\]?)");
+		Pattern namedateRefPat = Pattern.compile("([a-zA-Z,\\. ]+)([0-9]{4})");
+		Pattern refHeadingPat = Pattern
+				.compile("<p( id=\"([a-zA-Z_0-9]+)\")? class=\"ref\"(id=\"([a-zA-Z_0-9]+)\")?>(.*?)</p>");// <p
+																											// class=\"ref\" id=\"([a-zA-Z_0-9]+)\">(.*?)</p>");
+		Matcher refHeadingMat = refHeadingPat.matcher(tx1FileContent);
+		Matcher refLblMatcher = refLblPattern.matcher(tx1FileContent);
+		String refstyle = jidMap.get("REF_TYPE");
+
+		while (refLblMatcher.find()) {
+			String refLabel = refLblMatcher.group(2);
+			if (refstyle != null && refstyle.toLowerCase().contains("numbered")) {
+				Matcher matRef = numRefPat.matcher(refLabel);
+
+				if (matRef.find()) {
+					if (refHeadingMat.find()
+							&& !refLabel.equalsIgnoreCase(matRef.group(0))) {
+						tx1FileContent = tx1FileContent
+								.replace(
+										refHeadingMat.group(5),
+										refHeadingMat.group(5)
+												+ "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;"
+												+ refstyle
+												+ " reference style are allowed for journal "
+												+ ceObj.getJid()
+												+ " &lt;/query&gt;--&gt;</span></span>");
+						break;
+					}
+
+				}
+			} else if (refstyle != null
+					&& refstyle.toLowerCase().contains("namedate")) {
+				Matcher namedateRef = namedateRefPat.matcher(refLabel);
+				if (!namedateRef.find()) {
+					if (refHeadingMat.find()) {
+						tx1FileContent = tx1FileContent
+								.replace(
+										refHeadingMat.group(5),
+										refHeadingMat.group(5)
+												+ "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;"
+												+ refstyle
+												+ " reference style are allowed for journal "
+												+ ceObj.getJid()
+												+ " &lt;/query&gt;--&gt;</span></span>");
+						break;
+					}
+
+				}
+			} else {
+			}
+
+		}
+
+		return tx1FileContent;
+	}
+
+	/**
+	 * Purpose of method is to check dot words exist in heading is not present in given dotwordlist.txt file then 
+	 * it generate query 
+	 * @param tx1FileContent
+	 * @param ceObj
+	 * @param jidMap
+	 * @return
+	 */
+	public String checkHeadingforDotWords(String tx1FileContent, CEBean ceObj,
+			Map<String, String> jidMap) {
+
+		/*
+		 * No dot words are allowed in heading except words existing in text
+		 * file
+		 */
+
+		List<String> DotWordList = UtilSingleton.getInstance()
+				.getDotwordInHeadingList();
+
+		StringBuffer sbac = new StringBuffer("");
+
+		if (DotWordList != null) {
+			for (String str : DotWordList) {
+				sbac.append(str).append(" ");
+			}
+
+		}
+		String allwords = sbac.toString().trim();
+		// <p id="editor_para_16" class="h1"
+
+		Pattern listPat = Pattern
+				.compile("<p( id=\"([a-zA-Z_0-9]+)\")? class=\"(h1|h2|h3)\"(.*?)>(.*?)</p>");
+		Matcher listMat = listPat.matcher(tx1FileContent);
+		Pattern dotPat = Pattern.compile("([a-zA-Z]+\\.)");
+		StringBuilder sb = null;
+		while (listMat.find()) {
+
+			Matcher dotMat = dotPat.matcher(listMat.group(5));
+			sb = new StringBuilder(" ");
+			while (dotMat.find()) {
+				if (allwords != null && !allwords.contains(dotMat.group(1))) { 
+					sb.append(dotMat.group(1) + ","); 
+				}
+			}
+			if (sb != null && !sb.toString().equals(" ")) {
+				String queryContent = "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; "
+						+ sb.toString()
+						+ " Words are not allowed in heading &lt;/query&gt;--&gt;</span></span>";
+				tx1FileContent = tx1FileContent.replace(listMat.group(5),
+						listMat.group(5) + queryContent);
+				sb = null;
+
+			}
+
+		}
+		return tx1FileContent;
+	}
+
+	
+	/**
+	 * Purpose of method is to check majority of literal
+	 * Accordingly replace in tx1FileContent
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String litreMajoritycheck(String tx1FileContent) {
+		
+		
+		Pattern refpat = Pattern.compile("(<p id=\"editor_para_(.*?)\"><span class=\"ref_lbl\">(.*?)</p>|(<p id=\"editor_para_[0-9]+\" class=\"del_ref\">(.*?)</p>|<p class=\"del_ref\" id=\"editor_para_[0-9]+\">(.*?)</p>))");
+		Matcher refMat = refpat.matcher(tx1FileContent);
+	    StringBuffer refdata=new StringBuffer();
+		while(refMat.find()){
+			refdata.append(refMat.group(0)); 
+			tx1FileContent=tx1FileContent.replace(refMat.group(0),"");
+		}
+
+		
+		
+		int value=0,secvalue=0;
+		int mmi=300;
+		String datay=null;
+		Pattern literpat=Pattern.compile("\\b[0-9]+(<span class=\"xps_thinspace\">&#8201;</span>|\\s)(L|l)\\b");
+		Matcher literMatcher = literpat.matcher(tx1FileContent);
+		
+		Pattern litpat=Pattern.compile("([A-Za-z])");
+		 while(literMatcher.find()){
+			 System.out.println(literMatcher.group(2));
+		 Matcher litMatcher = litpat.matcher(literMatcher.group(2));
+		 while(litMatcher.find()){
+			 String litdata=litMatcher.group(1);
+			 if(litdata.equals("l")){
+				 value++;
+			 }
+			 else if(litdata.equals("L")){
+				 secvalue++;
+			 }
+		 }
+		 }
+	 System.out.println(value+"------"+secvalue);
+		
+	 Pattern litpat12 = Pattern.compile("\\b[0-9]+((\\s)(L|l))\\b");
+		Matcher litMat = litpat12.matcher(tx1FileContent); 
+		while(litMat.find()){
+		//	System.out.println(litMat.group(0));
+			//System.out.println(litMat.group(2));
+		  	tx1FileContent=tx1FileContent.replace(litMat.group(0), litMat.group(0).replace(litMat.group(2), "<span class=\"xps_thinspace\">&#8201;</span>"));
+		}
+	 
+		Pattern literchngpat=Pattern.compile("\\b[0-9]+(<span class=\"xps_thinspace\">&#8201;</span>|\\s)(L|l)\\b");
+		Matcher literchngMatcher = literchngpat.matcher(tx1FileContent);
+		
+		Pattern litchngpat=Pattern.compile("(</span>(L|l)|(L|l))");
+		
+		 if(value > secvalue){
+		 while(literchngMatcher.find()){
+			System.out.println(literchngMatcher.group(0));
+			 String comlitdata=literchngMatcher.group(0);
+		 Matcher litchngMatcher = litchngpat.matcher(literchngMatcher.group(2));
+		 while(litchngMatcher.find()){ 
+			 String litdata1=litchngMatcher.group(1); 
+			  if(litdata1.contains("L")){
+				  tx1FileContent=tx1FileContent.replace(comlitdata,comlitdata.replace(litdata1,litdata1.toLowerCase())); 
+				  } 
+		 }
+		 }
+		 } if(secvalue>value){
+			 while(literchngMatcher.find()){
+				 Matcher litchngMatcher = litchngpat.matcher(literchngMatcher.group(0));
+				 String comlitdata=literchngMatcher.group(0);
+				 while(litchngMatcher.find()){
+					 String litdata1=litchngMatcher.group(0);
+						 if(litdata1.contains("l")){
+	  tx1FileContent=tx1FileContent.replace(comlitdata,comlitdata.replace(litdata1,litdata1.toUpperCase()));  
+						 }
+						  
+				 }
+				 } 
+		 } 
+		 
+			
+
+Pattern rpat = Pattern.compile("<p (class=\"ref\" id=\"editor_para_[0-9]+\")?(id=\"editor_para_[0-9]+\" class=\"ref\")?>References</p>");
+	Matcher rMat = rpat.matcher(tx1FileContent); 
+	while(rMat.find()){
+		//System.out.println(rMat.group(0));
+		tx1FileContent=tx1FileContent.replaceFirst(rMat.group(0), rMat.group(0)+refdata);
+	}
+		 
+		// System.out.println(tx1FileContent);
+		return tx1FileContent;
+
+	}
+
+	/**
+	 * Purpose of method is to check heading sequence 
+	 * Means after h1,h3 will not come so if this type of case exist in tx1FileContent
+	 * then it generate query
+	 * @param tx1FileContent
+	 * @param ceObj
+	 * @param jidMap
+	 * @return
+	 */
+	public String checkHeadingStyle(String tx1FileContent, CEBean ceObj,
+			Map<String, String> jidMap) {
+
+		Pattern sectionHeadingPattern = Pattern
+				.compile("<p class=\"h([1-9])\"(.*?)?>([0-9\\.]+)?(.*?)</p>");
+		Matcher sectionHeadingMat = sectionHeadingPattern
+				.matcher(tx1FileContent);
+		int previousHeading = 0;
+		StringBuffer sb = new StringBuffer();
+		while (sectionHeadingMat.find()) {
+			if (previousHeading == 0) {
+				previousHeading = Integer.parseInt(sectionHeadingMat.group(1));
+			}
+			if (Integer.parseInt(sectionHeadingMat.group(1)) >= previousHeading
+					&& Integer.parseInt(sectionHeadingMat.group(1)) != previousHeading
+					&& Integer.parseInt(sectionHeadingMat.group(1)) != previousHeading + 1) {
+
+				sectionHeadingMat
+						.appendReplacement(
+								sb,
+								sectionHeadingMat
+										.group(0)
+										.replace(
+												"</p>",
+												"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Heading style are not followed, after h"
+														+ previousHeading
+														+ " h"
+														+ sectionHeadingMat
+																.group(1)
+														+ " will not come &lt;/query&gt;--&gt;</span></span></p>"));
+			}
+			previousHeading = Integer.parseInt(sectionHeadingMat.group(1));
+
+		}
+		sectionHeadingMat.appendTail(sb);
+		return sb.toString();
+	}
+	
+
+	/**
+	 * Purpose of method is to check
+	 * @param tx1FileContent
+	 * @return
+	 */
+	public String eqimgdisplayednewline(String tx1FileContent) {
+		Pattern paraeqpat=Pattern.compile("<p (.*?)>(.*?)(<img (id=\"[a-z0-9_]+\" )?class=\"TDMathEditor\"([^>]*)? src=\"([^\"]*)\"([^>]*?) />)(.*?)</p>");
+		Matcher paraeqMatcher = paraeqpat.matcher(tx1FileContent);
+		
+		Pattern eqimgpat=Pattern.compile("<img (id=\"[a-z0-9_]+\" )?class=\"TDMathEditor\"([^>]*)? src=\"([^\"]*)\"([^>]*?) />"); 
+		while(paraeqMatcher.find()){ 
+			
+			 String paraeq=paraeqMatcher.group();
+			 Matcher eqimgMatcher = eqimgpat.matcher(paraeq);
+			 while(eqimgMatcher.find()){
+			//	 System.out.println(eqimgMatcher.group(0));
+				 tx1FileContent=tx1FileContent.replace(eqimgMatcher.group(0), "<br/>"+eqimgMatcher.group(0)+"<br/>");
+			 }
+		}
+		// System.out.println(tx1FileContent);
+		return tx1FileContent;
+	}
+
+	public String chemicalNameValidator(String editorContent) {
+		Pattern chemPattern=Pattern.compile("-cis-");
+		Matcher chemMatcher=chemPattern.matcher(editorContent);
+		while(chemMatcher.find()){
+			
+			 editorContent=editorContent.replace(chemMatcher.group(0), "-cchemis909-");
+		}
+		Pattern transPattern=Pattern.compile("-trans-");
+		Matcher transMatcher=transPattern.matcher(editorContent);
+		while(transMatcher.find()){
+			
+			 editorContent=editorContent.replace(transMatcher.group(0), "-trachemis909-");
+		}
+		
+		if(editorContent.contains("-cchemis909-")){
+			editorContent=editorContent.replace("-cchemis909-","<em>-cis-</em>");
+		} if(editorContent.contains("-trachemis909-")){
+			editorContent=editorContent.replace("-trachemis909-","<em>-trans-</em>");
+		}
+		
+		return editorContent;
+	}
+
+	public String capsLetterAfterDot(String editorContent) {
+		
+		String maindata = editorContent;
+		
+		Pattern pattern = Pattern.compile("\\.([^<]*)");
+
+		editorContent = editorContent.replaceAll("i.e.", "");
+
+		editorContent = editorContent.replaceAll("e.g.", "");
+
+		editorContent = editorContent.replaceAll("doi:", "");
+
+		editorContent = editorContent.replaceAll(
+				"<a href=\"([^\"]*?)\">([^<]*?)</a>", ""); 
+
+		Matcher matcher = pattern.matcher(editorContent);
+
+	//	String maindata = editorContent;
+
+		while (matcher.find()) {
+
+			String gr1 = matcher.group(1);
+
+			if (gr1.trim().length() > 0) {
+
+				if (Character.isLowerCase(gr1.trim().charAt(0))) {
+
+			maindata = maindata.replace(gr1,gr1.replace(gr1,
+	"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Kindly check small letter is not allowed after dot(.) &lt;/query&gt;--&gt;</span></span>"
+													+ gr1));
+					// System.out.println(maindata);
+
+				}
+			}
+		}
+
+		  //System.out.println(maindata);
+		return maindata;
+	}
+
+	public String referencePunctuationBeforeCitation(String tx1FileContent) {
+
+		Pattern publisherPattern = Pattern
+				.compile("(<span class=\"ref_pub_name\">(.*?)</span>([\\.,-/#!$%\\^&\\*;:{}=\\-_`(\\)?]))");
+		Matcher publisherMatcher = publisherPattern.matcher(tx1FileContent);
+		while (publisherMatcher.find()) {
+			// System.out.println(publisherMatcher.group(0));
+			String combinedvalue = publisherMatcher.group(2) + ""
+					+ publisherMatcher.group(3);
+			tx1FileContent = tx1FileContent
+					.replace(
+							publisherMatcher.group(0),
+							publisherMatcher
+									.group(0)
+									.replace(
+											publisherMatcher.group(2),
+											"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Kindly check punctuation is not allowed after publisher name &lt;/query&gt;--&gt;</span></span>"
+													+ publisherMatcher.group(2)));
+
+		}
+
+		// System.out.println(tx1FileContent);
+		return tx1FileContent;
+	}
+
+	public String validateColonStyle(String editorContent) {
+		Pattern pPattern = Pattern
+				.compile("<p id=\"editor_para_(.*?)\"><span class=\"ref_lbl\">(.*?)</p>");
+		Pattern idPattern = Pattern
+				.compile("<span class=\"ref_atitle\">(.*?)</span>");
+		Pattern colonMatcher = Pattern.compile("(:\\s([A-Z])([a-zA-Z]+))");
+		Matcher pMatcher = pPattern.matcher(editorContent);
+		String position = "Not Mentioned";
+		while (pMatcher.find()) {
+			String data = pMatcher.group(0);
+			Matcher idMatcher = idPattern.matcher(data);
+			while (idMatcher.find()) {
+				String spandata = idMatcher.group(0);
+				// System.out.println(spandata);
+				Matcher colMatcher = colonMatcher.matcher(spandata);
+				while (colMatcher.find()) {
+					editorContent = editorContent
+							.replace(
+									spandata,
+									spandata.replace(
+											colMatcher.group(0),
+											"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Kindly check there is a capital letter after colon in article &lt;/query&gt;--&gt;</span></span>"
+													+ colMatcher.group(0)));
+					// System.out.println( colMatcher.group(0));
+				}
+
+			}
+		}
+		// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	public String spaceRemoverBwPercentage(String editorContent) {
+		Pattern perPattern = Pattern.compile("[a-zA-Z|.]+(\\s%)");
+		Matcher permatcher = perPattern.matcher(editorContent);
+		while (permatcher.find()) {
+			// System.out.println(permatcher.group(0));
+			editorContent = editorContent.replace(permatcher.group(0),
+					permatcher.group(0).replace(" ", ""));
+		}
+		// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	public String validateSpaceNdashBetweenNumbers(String editorContent) {
+		Pattern beforeAndAfterPattern = Pattern
+				.compile("([0-9]+)\\s{1,}<span class=\"xps_ndash\">&#([0-9]+?);</span>\\s{1,}(([0-9]+))");
+		Pattern beforePattern = Pattern
+				.compile("([0-9]+)\\s{1,}<span class=\"xps_ndash\">&#([0-9]+?);</span>([0-9]+)");
+		Pattern afterPattern = Pattern
+				.compile("([0-9]+)<span class=\"xps_ndash\">&#([0-9]+?);</span>\\s{1,}([0-9]+)");
+		Matcher beforeAndAfterMatcher = beforeAndAfterPattern
+				.matcher(editorContent);
+		Matcher beforeMatcher = beforePattern.matcher(editorContent);
+		Matcher afterMatcher = afterPattern.matcher(editorContent);
+		while (beforeAndAfterMatcher.find()) {
+
+			// System.out.println(beforeAndAfterMatcher.group(1)+" - "+beforeAndAfterMatcher.group(3));
+			editorContent = editorContent
+					.replace(
+							beforeAndAfterMatcher.group(0),
+							beforeAndAfterMatcher
+									.group(0)
+									.replace(
+											beforeAndAfterMatcher.group(1)
+													+ " <span class=\"xps_ndash\">&#8211;</span> "
+													+ beforeAndAfterMatcher
+															.group(3),
+											beforeAndAfterMatcher.group(1)
+													+ "<span class=\"xps_ndash\">&#8211;</span>"
+													+ beforeAndAfterMatcher
+															.group(3)));
+		}
+		while (beforeMatcher.find()) {
+			// System.out.println(beforeMatcher.group(1)+" - "+beforeMatcher.group(3));
+			// System.out.println(beforeMatcher.group());
+			editorContent = editorContent
+					.replace(
+							beforeMatcher.group(0),
+							beforeMatcher
+									.group(0)
+									.replace(
+											beforeMatcher.group(1)
+													+ " <span class=\"xps_ndash\">&#8211;</span>"
+													+ beforeMatcher.group(3),
+											beforeMatcher.group(1)
+													+ "<span class=\"xps_ndash\">&#8211;</span>"
+													+ beforeMatcher.group(3)));
+
+		}
+		while (afterMatcher.find()) {
+			// System.out.println(afterMatcher.group());
+			editorContent = editorContent
+					.replace(
+							afterMatcher.group(0),
+							afterMatcher
+									.group(0)
+									.replace(
+											afterMatcher.group(1)
+													+ "<span class=\"xps_ndash\">&#8211;</span> "
+													+ afterMatcher.group(3),
+											afterMatcher.group(1)
+													+ "<span class=\"xps_ndash\">&#8211;</span>"
+													+ afterMatcher.group(3)));
+		}
+		// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	public String greekDelta(String editorContent) {
+		Pattern greekDeltaPattern = Pattern
+				.compile("(&#916;)(\\s{1,})([a-zA-Z0-9]+)");
+		Matcher greekDeltaMatcher = greekDeltaPattern.matcher(editorContent);
+		while (greekDeltaMatcher.find()) {
+			System.out.println(greekDeltaMatcher.group(0));
+			editorContent = editorContent
+					.replace(
+							greekDeltaMatcher.group(0),
+							"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Space appear after capital greek delta. Please check &lt;/query&gt;--&gt;</span></span>"
+									+ greekDeltaMatcher.group(0));
+
+		}
+
+		// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	public String doublePunctuation(String editorContent) {
+		Pattern pattern = Pattern.compile("<p (.*?)>(.*?)</p>");
+		Matcher matcher1 = pattern.matcher(editorContent);
+		while (matcher1.find()) {
+
+			String gr0 = matcher1.group(2);
+			Pattern punctuation = Pattern
+					.compile("([a-zA-Z0-9]+?)(\\s{0,})(!{2,}|;{2,}|\\.{2,}|-{2,}|,{2,}|:{2,}|'{2,}|\\?{2,})(\\s{0,})(([a-zA-Z0-9]+)?)");
+			Matcher matcher2 = punctuation.matcher(gr0);
+			while (matcher2.find()) {
+				System.out.println(matcher2.group(0));
+				editorContent = editorContent
+						.replace(
+								matcher2.group(0),
+								"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Double punctuation is present. Please check &lt;/query&gt;--&gt;</span></span>"
+										+ matcher2.group(0));
+
+			}
+
+		}
+		// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	public String validatecounterycode(String editorContent) {
+		Pattern counteryMatcher = Pattern
+				.compile("(Tel. :|fax:|Tel.:|fax:)\\s[0-9][0-9]");
+		Matcher counteryfound = counteryMatcher.matcher(editorContent);
+		while (counteryfound.find()) {
+			// System.out.println(counteryfound.group());
+			editorContent = editorContent
+					.replace(
+							counteryfound.group(0),
+							"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Country code is missing. Please check &lt;/query&gt;--&gt;</span></span>"
+									+ counteryfound.group(0));
+		}
+		// System.out.println(editorContent);
+		return editorContent;
+
+	}
+
+	public String makeItalicMultisymbolg(String editorContent) {
+		Pattern multiScriptPattern = Pattern
+				.compile("[0-9]+<span class=\"xps_thinspace\">&#8201;</span>&#215;<span class=\"xps_thinspace\">&#8201;</span>g");
+		Matcher multiScriptMatcher = multiScriptPattern.matcher(editorContent);
+		while (multiScriptMatcher.find()) {
+			editorContent = editorContent
+					.replace(
+							multiScriptMatcher.group(0),
+							"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Please check multi symbol is there and g is roman. &lt;/query&gt;--&gt;</span></span>"
+									+ multiScriptMatcher.group(0));
+			System.out.println(multiScriptMatcher.group(0));
+		}
+
+		// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	public String spaceisAfterAndBeforeThinSpace(String editorContent) {
+		Pattern thinSpacePattern = Pattern.compile("(<span class=\"xps_thinspace\">&#8201;</span>)(\\s)");  
+		Matcher thinSpaceMatcher = thinSpacePattern.matcher(editorContent);
+	int i=500;
+		while(thinSpaceMatcher.find()){
+			 
+	// System.out.println(thinSpaceMatcher.group(0).trim()+"Space appearing after thin space");
+ editorContent=editorContent.replace(thinSpaceMatcher.group(0),thinSpaceMatcher.group(0).trim()); 
+	}// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	public String citedreferenceBeforeCitation(String editorContent) {
+		Pattern reflinkingCitationPattern = Pattern
+				.compile("([,;.!?-])(\\s{0,})(<span class=\"xps_reflinking\">(.*?)</span>)");
+		Pattern ndReflinkingCitationPattern = Pattern
+				.compile("([,;.!?-])(\\s{0,})(<span class=\"xps_ndreflinking\">(.*?)</span>)");
+		Matcher reflinkingCitationMatcher = reflinkingCitationPattern
+				.matcher(editorContent);
+		Matcher ndreflinkingCitationMatcher = ndReflinkingCitationPattern
+				.matcher(editorContent);
+		while (reflinkingCitationMatcher.find()) {
+			
+			editorContent = editorContent
+					.replace(
+							reflinkingCitationMatcher.group(0),
+							reflinkingCitationMatcher
+									.group(0)
+									.replace(
+											reflinkingCitationMatcher.group(4),
+											"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Please check space is present after thin space. &lt;/query&gt;--&gt;</span></span>"
+													+ reflinkingCitationMatcher
+															.group(4)));
+		}
+		while (ndreflinkingCitationMatcher.find()) {
+			
+			editorContent = editorContent
+					.replace(
+							ndreflinkingCitationMatcher.group(0),
+							ndreflinkingCitationMatcher
+									.group(0)
+									.replace(
+											ndreflinkingCitationMatcher
+													.group(4),
+											"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Please check space is present after thin space. &lt;/query&gt;--&gt;</span></span>"
+													+ ndreflinkingCitationMatcher
+															.group(4)));
+
+		}
+		// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	public String validateAffilationforcountryname(String editorContent) {
+		Pattern affPattern = Pattern
+				.compile("<(p)( id=\"([a-zA-Z_0-9]+)\")?( class=\"aff\")( id=\"([a-zA-Z_0-9]+)\")?>(.*?)</p>");
+		Matcher affMatcher = affPattern.matcher(editorContent);
+		Pattern saffPattern = Pattern
+				.compile("<(p)( id=\"([a-zA-Z_0-9]+)\")?( class=\"saff\")( id=\"([a-zA-Z_0-9]+)\")?>(.*?)</p>");
+		Matcher saffMatcher = saffPattern.matcher(editorContent);
+		String position = "Not Identified";
+		while (saffMatcher.find()) {
+			// System.out.println(saffMatcher.group(7));
+			Pattern affcountryPattern = Pattern
+					.compile("<span class=\"xps_country\">(.*?)</span>(\\s{0,})([.,:!?;])");
+			Matcher affCountryMatcher = affcountryPattern.matcher(saffMatcher
+					.group(7));
+			if (affCountryMatcher.find()) {
+				System.out.println(affCountryMatcher.group(0));
+				editorContent = editorContent
+						.replace(
+								saffMatcher.group(7),
+								saffMatcher
+										.group(7)
+										.replace(
+												affCountryMatcher.group(0),
+												"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Please check punctuation is present at the end of country name. &lt;/query&gt;--&gt;</span></span>"
+														+ affCountryMatcher
+																.group(0)));
+
+			}
+
+		}
+		// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	public String warningInPlaceCommaToAnd(String editorContent) {
+		Pattern alphaPattern = Pattern
+				.compile(
+						"\\b(Fig.|fig|Fig|FIG|Figure|figure|FIGURE|figures|Figures)\\s\\([a-z],[a-z]\\)",
+						Pattern.CASE_INSENSITIVE);
+		Matcher alphamatcher = alphaPattern.matcher(editorContent);
+		int count = 0;
+		while (alphamatcher.find()) {
+			String patch = alphamatcher.group(0);
+			System.out.println(patch);
+			editorContent = editorContent
+					.replace(
+							alphamatcher.group(0),
+							"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Please check there is comma between consecutive subparts of a figure in text citations. &lt;/query&gt;--&gt;</span></span> "
+									+ alphamatcher.group(0));
+
+		}
+		// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	public String coltdcomma(String editorContent) {
+		Pattern refremovePattern = Pattern.compile("\\bCo\\.\\sLtd\\.([^,])");
+		Matcher refremovematcher = refremovePattern.matcher(editorContent);
+
+		while (refremovematcher.find()) {
+			System.out.println(refremovematcher.group(0));
+			editorContent = editorContent
+					.replace(
+							refremovematcher.group(0),
+							"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Please check comma is missing at the end. &lt;/query&gt;--&gt;</span></span>"
+									+ refremovematcher.group(0));
+
+		}
+		// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	public String spacebetnoandgreekletter(String tx1FileContent) {
+		Pattern alphaPattern = Pattern.compile("\\b([0-9]+)(\\s&#945;)"); 
+	     Matcher alphamatcher = alphaPattern.matcher(tx1FileContent); 
+	     
+		while(alphamatcher.find()){
+			 
+		// System.out.println(alphamatcher.group(2)+""+alphamatcher.group(1));
+		 tx1FileContent=tx1FileContent.replace(alphamatcher.group(0),alphamatcher.group(0).replace(alphamatcher.group(2),"greekTD"+alphamatcher.group(2)));  
+		}	
+		
+		Pattern alphagreekPattern = Pattern.compile("\\b([0-9]+)(greekTD\\s&#945;)");
+		Matcher alphagreekmatcher = alphagreekPattern.matcher(tx1FileContent); 
+	    
+		while(alphagreekmatcher.find()){
+			 
+		// System.out.println(alphagreekmatcher.group(2));
+	 	 tx1FileContent=tx1FileContent.replace(alphagreekmatcher.group(0),"<span class=\"mceNonEditable\"><span id=\"QRY0\" class=\"QRY0\">&lt;!--&lt;query&gt; Please check space is present between greek symbol and number. &lt;/query&gt;--&gt;</span></span>"+alphagreekmatcher.group(0).replace("greekTD &#945;"," &#945;"));  
+		}	
+		// System.out.println(tx1FileContent);
+		return tx1FileContent;
+	}
+	 
+			
+			public String theBeforeEq(String tx1FileContent) {
+		Pattern thePattern = Pattern.compile("((the)\\s(|\\()(Eq.|Eqs.))\\s<span(.*?)>(\\([0-9]+\\))</span>(|\\))");	 
+		Matcher theMatcher = thePattern.matcher(tx1FileContent);
+		
+		while(theMatcher.find()){
+			 
+			System.out.println(theMatcher.group(5));
+			tx1FileContent=tx1FileContent.replace(theMatcher.group(0), theMatcher.group(0).replace(theMatcher.group(4), theMatcher.group(4)+"<span id=\"QRY0\" class=\"QRY0\">&lt;!--&lt;query&gt; Please check \"the\" is present before \"Eq.\" . &lt;/query&gt;--&gt;</span> "));
+		}	
+		// System.out.println(tx1FileContent);
+		return tx1FileContent;
+	}
+
+	public String lnandopeningparenthesis(String editorContent) {
+		Pattern paraPattern = Pattern.compile("<p (.*?)>(.*?)</p>");
+		Pattern inSpaceBeforeParathenses = Pattern
+				.compile("ln(\\s{1,})(\\(<em>c</em><sub>0</sub>/<em>c</em>\\))");
+		Matcher inSpaceBeforeParathensesMatcher = null;
+		Matcher paraMathcer = paraPattern.matcher(editorContent);
+		String editorPara = "";
+		while (paraMathcer.find()) {
+			editorPara = paraMathcer.group(0);
+			inSpaceBeforeParathensesMatcher = inSpaceBeforeParathenses
+					.matcher(paraMathcer.group(2));
+			while (inSpaceBeforeParathensesMatcher.find()) {
+
+				System.out.println(inSpaceBeforeParathensesMatcher.group());
+				editorContent = editorContent
+						.replace(
+								editorPara,
+								editorPara.replace(
+										inSpaceBeforeParathensesMatcher.group(),
+										"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Please check space  appearing between ln (c0/c). &lt;/query&gt;--&gt;</span></span>"
+												+ inSpaceBeforeParathensesMatcher
+														.group()));
+			}
+		}
+		// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	public String tablescitedwordTable(String editorContent) {
+		Pattern tableCitedPattern = Pattern
+				.compile("<span class=\"xps_afloatlinking\">(Table\\s{0,}([0-9]+)\\s{0,}(([^</>]).*?)\\s{0,}([0-9]+))</span>");
+		Matcher tableCitedMatcher = tableCitedPattern.matcher(editorContent);
+		while (tableCitedMatcher.find()) {
+			// System.out.println(tableCitedMatcher.group(3));
+			editorContent = editorContent
+					.replace(
+							tableCitedMatcher.group(0),
+							tableCitedMatcher
+									.group(0)
+									.replace(
+											tableCitedMatcher.group(3),
+											"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Please check  there are more than one tables are cited with the word \"Table\". &lt;/query&gt;--&gt;</span></span>"
+													+ tableCitedMatcher
+															.group(3)));
+
+		}
+
+		Pattern tableACitedPattern = Pattern
+				.compile("<span class=\"xps_floatlinking\">(Table\\s{0,}([0-9]+)\\s{0,}(([^</>]).*?)\\s{0,}([0-9]+))</span>");
+		Matcher tableACitedMatcher = tableACitedPattern.matcher(editorContent);
+		while (tableACitedMatcher.find()) {
+			// System.out.println(tableACitedMatcher.group());
+			editorContent = editorContent
+					.replace(
+							tableACitedMatcher.group(0),
+							tableACitedMatcher
+									.group(0)
+									.replace(
+											tableACitedMatcher.group(3),
+											"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Please check  there are more than one tables are cited with the word \"Table\". &lt;/query&gt;--&gt;</span></span>"
+													+ tableACitedMatcher
+															.group(3)));
+
+		}
+		// System.out.println(editorContent);
+		return editorContent;
+
+	}
+
+	public String warnForRepitativeUnit(String editorContent) {
+		Pattern unitPattern = Pattern
+				.compile("[0-9]+<span class=\"xps_thinspace\">&#8201;</span>&#176;[A-Z]<span class=\"xps_ndash\">&#8211;</span>[0-9]+<span class=\"xps_thinspace\">&#8201;</span>&#176;[A-Z]");
+		Matcher unitmatcher = unitPattern.matcher(editorContent);
+		while (unitmatcher.find()) {
+			System.out.println(unitmatcher.group(0));
+			editorContent = editorContent
+					.replace(
+							unitmatcher.group(0),
+							"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Please check Units are repeating here. &lt;/query&gt;--&gt;</span></span>"
+									+ unitmatcher.group(0));
+		}
+
+		// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	public String checkFirstNLastPageInReference(String txtContent,
+			Map<String, String> jidMap) {
+
+		Pattern pgPattern = Pattern
+				.compile("<span class=\"ref_fpage\">[0-9]+</span>(.*?)<span class=\"ref_lpage\">[0-9]+</span>");
+		Matcher pgMatcher = pgPattern.matcher(txtContent);
+		StringBuffer sb = new StringBuffer();
+
+		while (pgMatcher.find()) {
+
+			String grp1 = pgMatcher.group(1);
+
+			if (grp1 != null && grp1.contains("\\")) {
+
+				pgMatcher
+						.appendReplacement(
+								sb,
+								pgMatcher
+										.group(0)
+										.replace(
+												"\\",
+												"\\\\<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; \\\\ are coming in page range &lt;/query&gt;--&gt;</span></span>"));
+			}
+			
+			
+			if (grp1 != null && grp1.contains(",")) {
+
+				pgMatcher
+						.appendReplacement(
+								sb,
+								pgMatcher
+										.group(0)
+										.replace(
+												",",
+												",<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; , are coming in page range &lt;/query&gt;--&gt;</span></span>"));
+			}
+
+		}
+
+		pgMatcher.appendTail(sb);
+
+		return sb.toString();
+
+	}
+
+	public String checkMinusBeforeNumber(String txtContent,
+			Map<String, String> jidMap) {
+
+		Pattern minusPat = Pattern.compile("( -(<sup>)?[0-9]+(</sup>)?)");
+		Matcher minusMat = minusPat.matcher(txtContent);
+		StringBuffer sb = new StringBuffer();
+
+		while (minusMat.find()) {
+
+			String grp1 = minusMat.group(1);
+
+			minusMat.appendReplacement(
+					sb,
+					minusMat.group(0)
+							.replace(
+									grp1,
+									grp1
+											+ "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Minus occured before number &lt;/query&gt;--&gt;</span></span>"));
+
+		}
+
+		minusMat.appendTail(sb);
+
+		return sb.toString();
+
+	}
+
+	public String checkSpaceBetweenFloatElementsNnumber(String txtContent,
+			Map<String, String> jidMap) {
+
+		Pattern floatSpacePat = Pattern
+				.compile("\\b(Figure|figure|FIGURE|fig|Fig|FIG|Figura|figura|Tabela|Tabelle|Tableau|TABLEAU|table|tabela|Table|Tabla|TABLE|tab|Tab|TAB)(s)?(\\.)?\\s?(([0-9]+)?[a-z]*\\.?[0-9ixv]+[a-z]?+(\\s?(e|et|and|und|(<span class=\"xps_ndash\">&#8211;</span>|,))\\s?([0-9]+)?[a-z]*\\.?[0-9ixv]+[a-z]?+)?)");
+		Matcher floatSpaceMat = floatSpacePat.matcher(txtContent);
+		StringBuffer sb = new StringBuffer();
+
+		while (floatSpaceMat.find()) {
+
+			String grp0 = floatSpaceMat.group(0);
+
+			if (grp0 != null && !grp0.contains(" ")) {
+
+				floatSpaceMat
+						.appendReplacement(
+								sb,
+								floatSpaceMat
+										.group(0)
+										.replace(
+												grp0,
+												grp0
+														+ "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Space is missing between word and number in word "
+														+ grp0
+														+ " &lt;/query&gt;--&gt;</span></span>"));
+			}
+
+		}
+
+		floatSpaceMat.appendTail(sb);
+
+		return sb.toString();
+
+	}
+
+	public String checkPHValue(String txtContent, Map<String, String> jidMap) {
+
+		Pattern phvalPat = Pattern.compile(" pH ([0-9]+)?");
+		Matcher phvalMat = phvalPat.matcher(txtContent);
+		StringBuffer sb = new StringBuffer();
+
+		while (phvalMat.find()) {
+
+			String grp1 = phvalMat.group(1);
+
+			if (grp1 == null || phvalMat.equals("")) {
+
+				phvalMat.appendReplacement(
+						sb,
+						phvalMat.group(0)
+								.replace(
+										phvalMat.group(0),
+										phvalMat.group(0)
+												+ "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Value is missing after pH &lt;/query&gt;--&gt;</span></span>"));
+			}
+
+		}
+
+		phvalMat.appendTail(sb);
+
+		return sb.toString();
+
+	}
+
+	public String checkSpaceBeforeMinus(String txtContent,
+			Map<String, String> jidMap) {
+
+		Pattern minusPat = Pattern.compile("(<sup>-</sup>)(\\s)?");
+		Matcher minusMat = minusPat.matcher(txtContent);
+		StringBuffer sb = new StringBuffer();
+
+		while (minusMat.find()) {
+
+			String grp2 = minusMat.group(2);
+
+			if (grp2 == null || grp2.equals("")) {
+
+				minusMat.appendReplacement(
+						sb,
+						minusMat.group(0)
+								.replace(
+										minusMat.group(1),
+										minusMat.group(1)
+												+ "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; space is missing after minus &lt;/query&gt;--&gt;</span></span>"));
+			}
+
+		}
+
+		minusMat.appendTail(sb);
+
+		return sb.toString();
+
+	}
+
+	public String checkSpaceBetweenInNOpeningBracket(String txtContent,
+			Map<String, String> jidMap) {
+
+		Pattern bracketPat = Pattern.compile("(In|in|IN|iN)(\\s)?\\(");
+		Matcher bracketMat = bracketPat.matcher(txtContent);
+		StringBuffer sb = new StringBuffer();
+
+		while (bracketMat.find()) {
+
+			String grp2 = bracketMat.group(2);
+
+			if (grp2 == null || grp2.equals("")) {
+
+				bracketMat
+						.appendReplacement(
+								sb,
+								bracketMat
+										.group(0)
+										.replace(
+												bracketMat.group(1),
+												bracketMat.group(1)
+														+ "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; space is missing between "
+														+ bracketMat.group(1)
+														+ " and  ( minus &lt;/query&gt;--&gt;</span></span>"));
+			}
+
+		}
+
+		bracketMat.appendTail(sb);
+
+		return sb.toString();
+
+	}
+
+	public String checkZeroIssueVolume(String txtContent,
+			Map<String, String> jidMap) {
+
+		Pattern volissuePat = Pattern
+				.compile("<span class=\"ref_(vol|issue)\">(.*?)</span>");
+		Matcher volissueMat = volissuePat.matcher(txtContent);
+		StringBuffer sb = new StringBuffer();
+
+		while (volissueMat.find()) {
+
+			String grp2 = volissueMat.group(2);
+
+			if (grp2 != null && grp2.equals("0")) {
+
+				volissueMat
+						.appendReplacement(
+								sb,
+								volissueMat
+										.group(0)
+										.replace("</span>","<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; "+ volissueMat.group(1)+ " is zero &lt;/query&gt;--&gt;</span></span></span>"));
+			}
+
+		}
+
+		volissueMat.appendTail(sb);
+
+		return sb.toString();
+
+	}
+
+	
+	
+
+	public String spaceismissingbwetweendegandunit(String editorContent) {
+		
+		    Pattern degcPattern = Pattern.compile("(<span class=\"xps_thinspace\">&#8201;</span>)(C)\\b"); 
+		    Matcher degcmatcher = degcPattern.matcher(editorContent); 
+			while(degcmatcher.find()){
+				 
+		        editorContent=editorContent.replace(degcmatcher.group(0),degcmatcher.group(0).replace(degcmatcher.group(1),degcmatcher.group(1)+"<span class=\"mceNonEditable\"><span id=\"QRY0\" class=\"QRY0\">&lt;!--&lt;query&gt; Please check degree symbol is missing between unit and value. &lt;/query&gt;--&gt;</span></span>"));
+				 
+			}
+		return editorContent;
+	}
+
+	public String corrplusspace(String tx1FileContent) {
+		
+		Pattern mainPattern = Pattern.compile("<p (id=\"editor_para_[0-9]+\" class=\"cor\"|class=\"cor\" id=\"editor_para_[0-9]+\")>(.*?)</p>");
+		Pattern corPattern = Pattern.compile("\\+\\s[0-9]+"); 
+	    Matcher mainmatcher = mainPattern.matcher(tx1FileContent); 
+	    while(mainmatcher.find()){
+	    	String plusdata=mainmatcher.group(2);
+	    	 Matcher cormatcher = corPattern.matcher(plusdata); 
+	    	  while(cormatcher.find()){
+	    		  
+	    		  tx1FileContent=tx1FileContent.replace(plusdata, plusdata.replace(cormatcher.group(0), cormatcher.group(0).replace(" ","")));
+	    	  }
+	    }
+	   
+		return tx1FileContent;
+	}
+	
+	
+	
+	public String checkPartReferenceLinking(String editorContent) {
+		
+		 Pattern refPartLinkPat = Pattern.compile("<span class=\"xps_reflinking\">(.*?)</span>"); 
+		 Matcher refPartLinkMat = refPartLinkPat.matcher(editorContent); 
+		 List<String> refLinkList=new ArrayList<String>();//adding all callout in list
+		  
+			while(refPartLinkMat.find()){
+				refLinkList.add(refPartLinkMat.group(1));
+							
+			}
+		
+		
+		 Pattern refPartPat = Pattern.compile("<p( id=\"editor_para_[0-9]+\")?>(<span class=\"ref_lbl\">(\\[[0-9]+\\])</span>)?(<span class=\"part_lbl\">([a-z]\\)?)</span>)"); 
+		 Matcher refPartMat = refPartPat.matcher(editorContent); 
+		
+		   String lblCount=null;
+		   String partLabel=null;
+		   StringBuffer sb=new StringBuffer();
+			while(refPartMat.find()){
+				
+			if(refPartMat.group(2)!=null && refPartMat.group(4)!=null){
+				lblCount=refPartMat.group(3);
+				partLabel=lblCount.replaceAll("\\[", "").replaceAll("\\]", "")+refPartMat.group(5).replace(")","").trim();
+				if(refLinkList!=null && !refLinkList.toString().contains(partLabel)){
+					refPartMat.appendReplacement(sb, refPartMat.group(0).replace(refPartMat.group(4), refPartMat.group(4)+"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;Callout is missing. Please check it. &lt;/query&gt;--&gt;</span></span>"));
+				}
+				
+				
+			}
+			if(refPartMat.group(2)==null && refPartMat.group(4)!=null ){
+				partLabel=lblCount+refPartMat.group(4).replace(")","").trim();
+				if(refLinkList!=null && !refLinkList.contains(partLabel)){
+					refPartMat.appendReplacement(sb, refPartMat.group(0).replace(refPartMat.group(4), refPartMat.group(4)+"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;Callout is missing. Please check it. &lt;/query&gt;--&gt;</span></span>"));
+				}
+			}
+		
+		}
+			refPartMat.appendTail(sb);
+		 
+		return sb.toString();
+	}
+	
+	
+	public String checkColumnAlignment(String editorContent) {
+
+
+		Pattern trPat = Pattern.compile("<tr>((.*\\n)*?)</tr>",Pattern.MULTILINE);
+		Matcher trMat = trPat.matcher(editorContent);
+		StringBuffer sb=new StringBuffer();
+		while (trMat.find()) {
+			
+			        String grp1=trMat.group(1);
+					int tdCount = StringUtils.countMatches(grp1, "<td");
+					Pattern tdPattern = Pattern
+							.compile("<td(.*?)>\\s<p(.*?)><span class=\"char_(.*?)\">(.*?)</span></p>\\s</td>");
+					Matcher tdMatcher = tdPattern.matcher(grp1);
+					int alignCount = 0;
+					while (tdMatcher.find()) {
+
+						alignCount++;
+					}
+					if (tdCount != alignCount && alignCount==tdCount-1) {
+						String newGrp1=grp1.replaceFirst("</p>", "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;Please apply alignment on all column. &lt;/query&gt;--&gt;</span></span></p>");
+						trMat.appendReplacement(sb, trMat.group(0).replace(grp1, newGrp1));
+						
+					}
+				}
+		trMat.appendTail(sb);
+			
+		return sb.toString();
+	}
+	
+
+
+	public String authoremaillinked(String editorContent) {
+		Pattern auPattern = Pattern
+				.compile("<p (id=\"(.*?)\" class=\"au\"|class=\"au\" id=\"(.*?)\")>(.*?)</p>");
+		Pattern corPattern = Pattern
+				.compile("<p (id=\"(.*?)\" class=\"cor\"|class=\"cor\" id=\"(.*?)\")>(.*?)</p>");
+		String emailregex = "([A-Za-z0-9](([_\\.\\-]?[a-zA-Z0-9]+)*)@([A-Za-z0-9]+)(([\\.\\-]?[a-zA-Z0-9]+)*)\\.([A-Za-z]{2,}))";
+		Pattern emailPattern = Pattern.compile(emailregex);
+		Matcher aucmatcher = auPattern.matcher(editorContent);
+		while (aucmatcher.find()) {
+			String data = aucmatcher.group(4);
+			// System.out.println(data);
+			Matcher cormatcher = corPattern.matcher(editorContent);
+			while (cormatcher.find()) {
+				String emaildata = cormatcher.group(4);
+				Matcher emailmatcher = emailPattern.matcher(emaildata);
+				while (emailmatcher.find()) {
+					if (data.contains(emailmatcher.group())) {
+
+						editorContent = editorContent
+								.replace(
+										data,
+										data.replace(
+												emailmatcher.group(),
+												"<span class=\"mceNonEditable\"><span id=\"QRY"
+														+ queryId++
+														+ "\" class=\"QRY0\">&lt;!--&lt;query&gt;  please check correspounding email address is linked with other author. &lt;/query&gt;--&gt;</span></span></span>"
+														+ emailmatcher.group()));
+					} else {
+
+					}
+				}
+
+			}
+		}
+		// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	public String pspaceafterdotauname(String editorContent) {
+		 Pattern auPattern = Pattern.compile("<p (id=\"(.*?)\" class=\"au\"|class=\"au\" id=\"(.*?)\")>(.*?)</p>"); 
+		 Matcher aucmatcher = auPattern.matcher(editorContent); 
+		 Pattern spanPattern = Pattern.compile("<span class=(.*?)>(.*?)</span>"); 
+		 Pattern namePattern = Pattern.compile("([A-Za-z]+\\.)+[^<|^&]",Pattern.UNICODE_CHARACTER_CLASS); 
+			while(aucmatcher.find()){
+				String spandata=aucmatcher.group(4);
+				System.out.println(spandata);
+				 Matcher spanmatcher = spanPattern.matcher(spandata); 
+					while(spanmatcher.find()){
+						String name=spanmatcher.group(0);
+						//System.out.println(name);
+						 Matcher namematcher = namePattern.matcher(name); 
+							while(namematcher.find()){
+								System.out.println(namematcher.group());
+	 editorContent=editorContent.replace(spandata, spandata.replace(namematcher.group(), "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt;  please check after dot there is no space in name. &lt;/query&gt;--&gt;</span></span></span>"+ namematcher.group()));
+							}
+						}
+					}
+			//System.out.println(editorContent);
+			return editorContent;
+	}
+
+public String abstract_Floating_Citation_Query(String tx1FileContent) {
+
+		
+	Pattern paraPattern = Pattern.compile("<p (id=\"editor_para_[0-9]+\" class=\"absp\"|class=\"absp\" id=\"editor_para_[0-9]+\")>(.*?)</p>");
+	Pattern linkingPattern = Pattern.compile("((<span class=\"xps_afloatlinking\">)|(<span class=\"xps_floatlinking\">))");
+	    Matcher paraMatcher = paraPattern.matcher(tx1FileContent);
+		while(paraMatcher.find()){
+		String paradata=paraMatcher.group(0);
+	 //	System.out.println(paradata);
+		Matcher linkingMatcher = linkingPattern.matcher(paradata);
+		while(linkingMatcher.find()){
+			tx1FileContent=tx1FileContent.replace(paradata,paradata.replace(linkingMatcher.group(),"<span class=\"mceNonEditable\"><span id=\"QRY0\" class=\"QRY0\">&lt;!--&lt;query&gt; Kindly check FloatLinking is present in Abstract&lt;/query&gt;--&gt;</span></span>"+linkingMatcher.group()));
+
+		}
+	}
+	  
+		return tx1FileContent; 
+	}
+ 
+
+public String style5(String txtContent, Map<String, String> jidMap) {
+
+	Session session = DBConnectionProvider.getSession();
+	session.beginTransaction(); 
+	
+	Pattern countryPattern = Pattern.compile("((((<p id=(.*?) class=\"saff\">)|(<p class=\"saff\" id=(.*?)>))(.*?)</p>))");	 
+	Matcher countryMatcher = countryPattern.matcher(txtContent); 
+	
+	Pattern namePattern = Pattern.compile("<span class=\"xps_country\">([A-Za-z]+)(.*?)</span>");	 
+	
+	
+	while(countryMatcher.find()){
+		
+		String coundata=countryMatcher.group(0);
+		
+		Matcher nameMatcher = namePattern.matcher(coundata); 
+		while(nameMatcher.find()){
+			
+			String cname=nameMatcher.group(1); 
+			String fullnamematcher=nameMatcher.group(0); 
+			
+		
+			try {
+				
+				StringBuilder qryBuilder = new StringBuilder("select c.country from country c where c.country='"+cname.trim()+"'");
+				
+
+				Query query = session.createSQLQuery(qryBuilder.toString().trim());
+
+				if(query!=null && query.list()!=null && query.list().size()>0 ){
+				//	country = query.list().toString();
+				
+					 	 
+				}else{ 
+					 txtContent=txtContent.replace(fullnamematcher, fullnamematcher.replace(cname, "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Kindly check country name is not present in the list&lt;/query&gt;--&gt;</span>"+cname));
+                     }
+			  
+			} catch(Exception he) {
+				he.printStackTrace();
+			} 
+		}
+		
+	}
+	
+	
+	return txtContent;
+}
+
+
+public String authorAddress_Not_Email(String tx1FileContent) {
+	 
+	String regex = "((\\b(https|http):/[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]))";         
+	Pattern corrPattern = Pattern.compile("<div id=\"xps_corr\"(?:(?>[^<]+)|<(?!div\b[^>]*>))*?(.*?)</div>");
+	Matcher corrMatcher = corrPattern.matcher(tx1FileContent);
+	
+	Pattern corinPattern = Pattern.compile("((((<p id=(.*?) class=\"cor\">)|(<p class=\"cor\" id=(.*?)>))(.*?)</p>))");
+	
+	Pattern mailurlPattern = Pattern.compile(regex,Pattern.CASE_INSENSITIVE);
+	
+	if(corrMatcher.find()){
+		String cordata=corrMatcher.group(0);
+		Matcher corinmatcher=corinPattern.matcher(cordata);
+		while(corinmatcher.find()){
+			String indata=corinmatcher.group(8);
+		
+			Matcher mailurlMatcher=mailurlPattern.matcher(indata);
+			 while(mailurlMatcher.find()){
+				String url=mailurlMatcher.group(0);
+				tx1FileContent=tx1FileContent.replace(indata, indata.replace(url, "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Kindly check URL is present here &lt;/query&gt;--&gt;</span>"+url));
+
+			 }
+		}
+	}
+	
+	
+	String emailregex="([A-Za-z0-9](([_\\.\\-]?[a-zA-Z0-9]+)*)@([A-Za-z0-9]+)(([\\.\\-]?[a-zA-Z0-9]+)*)\\.([A-Za-z]{2,}))";
+	Pattern emailPattern = Pattern.compile("<div id=\"xps_corr\"(?:(?>[^<]+)|<(?!div\b[^>]*>))*?(.*?)</div>");
+	Matcher emailMatcher = emailPattern.matcher(tx1FileContent);
+	
+	Pattern emailinPattern = Pattern.compile("((((<p id=(.*?) class=\"cor\">)|(<p class=\"cor\" id=(.*?)>))(.*?)</p>))");
+	
+	Pattern emailurlPattern = Pattern.compile(emailregex,Pattern.CASE_INSENSITIVE);
+	
+	if(emailMatcher.find()){
+		String cordata=emailMatcher.group(0);
+		Matcher corinmatcher=emailinPattern.matcher(cordata);
+		while(corinmatcher.find()){
+			String indata=corinmatcher.group(8);
+		
+			Matcher emailurlMatcher=emailurlPattern.matcher(indata);
+			 while(emailurlMatcher.find()){
+				String email=emailurlMatcher.group(0);
+				 
+				tx1FileContent=tx1FileContent.replace(indata, indata.replace(email, "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Kindly check Email address is present here &lt;/query&gt;--&gt;</span></span>"+email));
+
+			 }
+		}
+	}
+	
+	return tx1FileContent;
+}
+
+
+public String SIUnits2query(String tx1FileContent) {
+	 TreeMap<String,String> statemap=new TreeMap();
+	 statemap.put("minutes","min");
+	 statemap.put("minute","min");
+	 statemap.put("milligram","mg");
+	 statemap.put("grams","gm");
+	 statemap.put("litre","l");  
+	 for(Map.Entry<String,String> entry : statemap.entrySet())
+	   {
+		   String key = entry.getKey();
+		   String value = entry.getValue();   
+		   Pattern SIPattern = Pattern.compile("\\b"+key+"\\b");
+		   Matcher SImatcher = SIPattern.matcher(tx1FileContent); 
+		   while(SImatcher.find()){
+			   tx1FileContent=tx1FileContent.replace(SImatcher.group(), value); 
+		   } 
+	   } 
+	 Pattern SIPattern = Pattern.compile("[0-9]+<span class=\"xps_thinspace\">&#8201;</span>(Pa|dyn)\\b");
+	 Matcher SImatcher = SIPattern.matcher(tx1FileContent); 
+	 int Pacount=0,dyncount=0,queryId=90;
+	 while(SImatcher.find()){ 
+		 if(SImatcher.group(0).contains("Pa")){
+			 Pacount++;
+		 }if(SImatcher.group(0).contains("dyn")){
+			 dyncount++;
+		 }
+	 }
+	 
+	 System.out.println(Pacount+"---------"+dyncount);
+	 
+	 Pattern SPattern = Pattern.compile("[0-9]+<span class=\"xps_thinspace\">&#8201;</span>(Pa|dyn)\\b");
+	 Matcher Smatcher = SPattern.matcher(tx1FileContent); 
+	while(Smatcher.find()){ 
+		 
+		 if(Pacount>0 && dyncount>0){
+			  tx1FileContent=tx1FileContent.replace(Smatcher.group(0), Smatcher.group(0).replace(Smatcher.group(1), "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Kindly check Pa and dyn both used for Pressure &lt;/query&gt;--&gt;</span></span>"+Smatcher.group(1)));
+		 } 
+		 
+	 }
+	return tx1FileContent;
+}
+}
