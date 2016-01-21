@@ -1,0 +1,2525 @@
+package com.elsevier;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Scanner;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+import org.hibernate.Query;
+import org.hibernate.Session;
+
+import com.dao.DBConnectionProvider;
+import com.model.CEBean;
+
+/**
+ * @author 76004
+ * 
+ */
+public class FixedCeCheck
+
+   {
+
+	private static final Logger logger = Logger.getLogger(FixedCeCheck.class);
+
+	public String threeBinomial(String tx1FileContent)
+	{
+		Pattern threePat = Pattern
+				.compile("Ala(<span class=\"xps_ndash\">&#8211;</span>)Arg<span class=\"xps_ndash\">&#8211;</span>Gly<span class=\"xps_ndash\">&#8211;</span>Phy<span class=\"xps_ndash\">&#8211;</span>Tyr");
+		Matcher threeMat = threePat.matcher(tx1FileContent);
+		if (threeMat.find())
+		{
+			tx1FileContent = tx1FileContent.replace(threeMat.group(1), "-");
+		}
+
+		return tx1FileContent;
+
+	}
+
+	/**
+	 * Method is used to check read all latin words from xml file and check in
+	 * editorContent
+	 * 
+	 * @param tx1FileContent
+	 * @param jidMap
+	 * @return String
+	 * @throws IOException
+	 */
+	public String getLatinTermsWordsInFinalContent(String tx1FileContent,Map<String, String> jidMap) throws IOException
+	{
+
+		List<String> latinList = new ArrayList();
+
+		//		 File filename=new File("latin_terms_words.txt");
+		 File filename = new File("D:/cecheck/latin_terms_words.txt");
+		String latindata = "";
+		try {
+			latindata = FileUtils.readFileToString(filename);
+		} catch (IOException fe) {
+			fe.printStackTrace();
+		}
+
+		String dat[] = latindata.split("\n");
+		for (int k = 0; k < dat.length; k++) {
+			latinList.add(dat[k].trim());
+		}
+		System.out.println(latinList);
+		Pattern refpattern = Pattern
+				.compile("(<p id=\"editor_para_(.*?)\"><span class=\"ref_lbl\">(.*?)</p>|(<p id=\"editor_para_[0-9]+\" class=\"del_ref\">(.*?)</p>))");
+		Matcher refmatcher = refpattern.matcher(tx1FileContent);
+		String finalcontent = tx1FileContent;
+		while (refmatcher.find())
+		{
+
+			tx1FileContent = tx1FileContent.replace(refmatcher.group(0), " ");
+		}
+		int romancount = 0;
+		int italicCount = 0;
+		Iterator<String> it = latinList.iterator();
+		Iterator<String> it1 = latinList.iterator();
+		while (it.hasNext()) 
+		{
+
+			String term = it.next();
+			String regex = "(\\b)" + term + "\\s";
+			String itegex = "\\s((<em>|<i>)" + term + "(</em>|</i>))";
+			itegex = itegex.replace(".", "\\.");
+			regex = regex.replace(".", "\\.");
+			Pattern romanPattern = Pattern.compile(regex);
+			Matcher romanMatcher = romanPattern.matcher(tx1FileContent);
+			Pattern italicLatinPattern = Pattern.compile(itegex);
+			Matcher italicLatinMatcher = italicLatinPattern
+					.matcher(tx1FileContent);
+			String italicLatin = "";
+			while (romanMatcher.find()) 
+			{
+				// System.out.println(romanMatcher.group(0)+"RRRRRRRRRRRRR");
+				romancount++;
+			}
+			while (italicLatinMatcher.find()) 
+			{
+				// System.out.println(italicLatinMatcher.group(0)+"IIIIIIIIIIIIIIIII");
+				italicCount++;
+			}
+
+		}
+		System.out.println(romancount + "----" + italicCount);
+		while (it1.hasNext()) {
+			String term1 = it1.next();
+			String regex1 = "(\\b)" + term1 + "\\s";
+			String itegex1 = "\\s((<em>|<i>)" + term1 + "(</em>|</i>))";
+			itegex1 = itegex1.replace(".", "\\.");
+			regex1 = regex1.replace(".", "\\.");
+			Pattern romanPattern1 = Pattern.compile(regex1);
+			Matcher romanMatcher1 = romanPattern1.matcher(tx1FileContent);
+			Pattern italicLatinPattern1 = Pattern.compile(itegex1);
+			Matcher italicLatinMatcher1 = italicLatinPattern1
+					.matcher(tx1FileContent);
+			if (romancount > italicCount) {
+				while (italicLatinMatcher1.find()) {
+					String itdata = italicLatinMatcher1.group(0);
+					// System.out.println(itdata);
+					finalcontent = finalcontent.replace(
+							italicLatinMatcher1.group(0),
+							itdata.replace("<em>", "").replace("</em>", ""));
+				}
+			}
+			if (italicCount > romancount) {
+				while (romanMatcher1.find()) {
+					String rodata = romanMatcher1.group(0);
+					finalcontent = finalcontent.replace(
+							romanMatcher1.group(0),
+							rodata.replace(romanMatcher1.group(0), "<em>"
+									+ rodata.trim() + "</em> "));
+					// System.out.println(rodata);
+
+				}
+			}
+		}
+
+		return finalcontent;
+
+	}
+
+	/**
+	 * Method is used to check article model from jidxml and if it is model6
+	 * then Abstract will change into Summary
+	 * 
+	 * @param tx1FileContent
+	 * @param jidMap
+	 * @return String
+	 * @throws IOException
+	 */
+	public String setAbstractToSummary(String tx1FileContent,
+			Map<String, String> jidMap) throws IOException {
+
+		Pattern abstractPat = Pattern
+				.compile("<p id=\"editor_para_[0-9]+\" class=\"abs\">(.*?)</p>");
+		Matcher abstractMat = abstractPat.matcher(tx1FileContent);
+
+		while (abstractMat.find()) {
+			if (jidMap.get("model") != null
+					&& jidMap.get("model").contains("model6")) {
+				tx1FileContent = tx1FileContent.replace(
+						abstractMat.group(0),
+						abstractMat.group(0).replace(abstractMat.group(1),
+								"Summary"));
+
+			}
+
+		}
+
+		return tx1FileContent;
+
+	}
+
+	/**
+	 * Method is used to make chapter title in sentence case in references
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String chapterTitleAndBookTitle(String tx1FileContent) {
+
+		Pattern chapbookRefPat = Pattern
+				.compile("<p id=\"editor_para_[0-9]+\"><span class=\"ref_lbl\">(.*?)</p>");
+		Matcher chapbookRefMat = chapbookRefPat.matcher(tx1FileContent);
+		Pattern chaptitPat = Pattern
+				.compile("(<span class=\"ref_ctitle\">|<span class=\"ref_btitle\">)(.*?)</span>");
+		while (chapbookRefMat.find()) 
+		{
+			String strdata = chapbookRefMat.group(0);
+			Matcher chaptitMat = chaptitPat.matcher(strdata);
+			while (chaptitMat.find()) 
+			{
+				System.out.println(chaptitMat.group(1));
+				if (chaptitMat.group(1).contains("class=\"ref_btitle\"")) 
+				{
+
+					String[] data = chaptitMat.group(2).toLowerCase().trim()
+							.replaceAll("&#160;", " ").split(" ");
+					StringBuffer sb = new StringBuffer();
+					for (String dat : data) 
+					{
+						sb.append(Character.toUpperCase(dat.charAt(0))
+								+ dat.substring(1, dat.length()) + " ");
+					}
+					// System.out.println("<span class=\"ref_btitle\">"+sb.toString().trim()+"</span>");
+					tx1FileContent = tx1FileContent.replace(
+							chaptitMat.group(0), "<span class=\"ref_btitle\">"
+									+ sb.toString().trim() + "</span>");
+				     }
+				    else
+				     {
+					String cdata = chaptitMat.group(2).toLowerCase().trim();
+					StringBuffer sb1 = new StringBuffer();
+					sb1.append(Character.toUpperCase(cdata.charAt(0))
+							+ cdata.substring(1, cdata.length()) + " ");
+					tx1FileContent = tx1FileContent.replace(
+							chaptitMat.group(0), "<span class=\"ref_ctitle\">"
+									+ sb1.toString().trim() + "</span>");
+					// System.out.println("<span class=\"ref_ctitle\">"+sb1.toString().trim()+"</span>");
+				}
+			}
+		}
+
+		return tx1FileContent;
+
+	}
+
+	/**
+	 * Method is used to make article title and journal title in senten                                                                                                                                                                                                                                                          
+	 * for journal type of references
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String jounalRefChangeArTandJTiToSenTi(String tx1FileContent) {
+
+		Pattern RefPat = Pattern
+				.compile("<p id=\"editor_para_(.*?)\"><span class=\"ref_lbl\">(.*?)</p>");
+		Matcher RefMat = RefPat.matcher(tx1FileContent);
+
+		Pattern jTitPat = Pattern
+				.compile("(<span class=\"ref_atitle\">(.*?)</span>)");
+		String finaldata = tx1FileContent;
+		while (RefMat.find()) {
+
+			String refdata = RefMat.group(0);
+
+			Matcher jTitMat = jTitPat.matcher(refdata);
+			while (jTitMat.find()) {
+				String names = jTitMat.group(2).toLowerCase();
+				String fullname = jTitMat.group(0);
+				names = names.replaceFirst(names.substring(0, 1), names
+						.substring(0, 1).toUpperCase());
+				fullname = fullname.replace(jTitMat.group(2), names);
+
+				refdata = refdata.replace(jTitMat.group(0), fullname);
+			}
+
+			finaldata = finaldata.replace(RefMat.group(0), refdata);
+		}
+
+		return finaldata;
+
+	}
+
+	/**
+	 * Method is used arrange keywords in alphabetical order
+	 * 
+	 * @param textContent
+	 * @return String
+	 */
+	public String keywordAllowedInAlphabeticalOrder(String textContent) {
+
+		Pattern keywordPattern = Pattern
+				.compile("<p ((id=\"editor_para_[0-9]+\")|(class=\"kwd\")) ((class=\"kwd\")|(role=\"keyword\")) ((role=\"keyword\")|(id=\"editor_para_[0-9]+\"))>(.*?)</p>");
+		Matcher kwdMat = keywordPattern.matcher(textContent);
+		Pattern subkwdPat = Pattern
+				.compile("<span class=\"keyword\">(.*?)</span>");
+		List<String> kwdlist = new ArrayList<String>();
+		List<String> kwdlist2 = new ArrayList<String>();
+		int k = 100, m = 100;
+
+		Pattern inkwdPat = Pattern.compile("[A-Za-z]+");
+		while (kwdMat.find()) {
+			Matcher subkwdMat = subkwdPat.matcher(kwdMat.group(0));
+			System.out.println(kwdMat.group(0));
+			while (subkwdMat.find()) {
+				String indata = subkwdMat.group(1).trim();
+
+				kwdlist.add(indata.trim());
+				kwdlist2.add(indata);
+
+			}
+		}
+		Collections.sort(kwdlist);
+		System.out.println(kwdlist + "--------\n" + kwdlist2);
+
+		Pattern listPat = Pattern
+				.compile("<span class=\"keyword\">(.*?)</span>");
+		Matcher listMat = listPat.matcher(textContent);
+		while (listMat.find()) {
+			System.out.println(listMat.group(1));
+			textContent = textContent.replace(listMat.group(0), listMat
+					.group(0).replace(listMat.group(1), "**KWD**" + ++k));
+
+		}
+
+		// System.out.println(textContent);
+		for (int i = 0; i < kwdlist.size(); i++) {
+			textContent = textContent.replace("**KWD**" + ++m, kwdlist.get(i));
+		}
+		//System.out.println(textContent);
+		return textContent;
+	}
+
+	/**
+	 * Method is used to arrange footnote in sequence
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String footNoteSequence(String tx1FileContent) {
+
+		Pattern footPattern = Pattern
+				.compile("[^-]<p (class=\"tfoot\" id=\"editor_para_[0-9]+\"|id=\"editor_para_[0-9]+\" class=\"tfoot\")>(<sup>(.*?)</sup>)(.*?)</p>");
+		Matcher HNMRMatcher = footPattern.matcher(tx1FileContent);
+		Map<String, String> tmap = new TreeMap<String, String>();
+		Pattern footPattern2 = Pattern
+				.compile("[^-]<p (class=\"tfoot\" id=\"editor_para_[0-9]+\"|id=\"editor_para_[0-9]+\" class=\"tfoot\")>(<sup>(.*?)</sup>)(.*?)</p>");
+		int ii = 0;
+		while (HNMRMatcher.find()) {
+			// System.out.println(HNMRMatcher.group(0));
+
+			tmap.put(HNMRMatcher.group(3), HNMRMatcher.group(0));
+			tx1FileContent = tx1FileContent.replace(HNMRMatcher.group(0),
+					"seqfootnote!!" + ii++);
+		}
+		// System.out.println(tx1FileContent);
+		Matcher HNMRMatcher2 = footPattern2.matcher(tx1FileContent);
+
+		int i = 0;
+		for (Map.Entry<String, String> entry : tmap.entrySet()) {
+
+			String key = entry.getKey();
+			String value = entry.getValue();
+			tx1FileContent = tx1FileContent.replace("seqfootnote!!" + i++,
+					value);
+			// System.out.println(value + " => ");
+		}
+
+		return tx1FileContent;
+
+	}
+
+	/**
+	 * Method is used to make US states in abbreviated form
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String usstate_Name_toAbbrevated_Form(String tx1FileContent) {
+
+		String	str = "AL,AK,AS,AZ,AR,CA,CO,CT,DE,DC,FM,FL,GA,GU,HI,ID,IL,IN,IA,KS,KY,LA,ME,MH,MD,MA,MI,MN,MS,MO,MT,NE,NV,NH,NJ,NM,NY,NC,ND,MP,OH,OK,OR,PW,PA,PR,RI,SC,SD,TN,TX,UT,VT,VI,VA,WA,WV,WI,WY";
+
+		 String  str1 = "Alabama,Alaska,American Samoa,Arizona,Arkansas,California,Colorado,Connecticut,Delaware,District Of Columbia,Federated States Micronesia,Florida,Georgia,Guam,Hawaii,Idaho,Illinois,Indiana,Iowa,Kansas,Kentucky,Louisiana,Maine,Marshall Islands,Maryland,Massachusetts,Michigan,Minnesota,Mississippi,Missouri,Montana,Nebraska,Nevada,New Hampshire,New Jersey,New Mexico,New York,North Carolina,North Dakota,Northern Mariana Islands,Ohio,Oklahoma,Oregon,Palau,Pennsylvania,Puerto Rico,Rhode Island,South Carolina,South Dakota,Tennessee,Texas,Utah,Vermont,Virgin Islands,Virginia,Washington,West Virginia,Wisconsin,Wyoming";
+
+		 String abb[]=str.split(",");
+		 String full[]=str1.split(",");
+		 TreeMap<String,String> statemap=new TreeMap();
+		for(int i=0;i<abb.length;i++)
+		{
+		   statemap.put(abb[i],full[i]);
+		} 
+		  
+		   Pattern abbPattern = Pattern.compile("((((<p id=(.*?) class=\"saff\">)|(<p class=\"saff\" id=(.*?)>))(.*?)</p>))");
+			Matcher abbMatcher = abbPattern.matcher(tx1FileContent); 
+			// Pattern counPattern = Pattern.compile("<span class=\"xps_city\">(([A-Za-z]+)(.*?))</span>"); 
+			 Pattern counPattern2 = Pattern.compile("<span class=\"xps_state\">(([A-Za-z]+)(.*?))</span>"); 
+			while(abbMatcher.find()){
+				String abbdata=abbMatcher.group(8);
+				System.out.println(abbdata);
+				Matcher counMatcher2 = counPattern2.matcher(abbdata);
+				while(counMatcher2.find()){
+					System.out.println(counMatcher2.group(0));
+					
+					System.out.println(counMatcher2.group(1));
+					String counName=counMatcher2.group(1);
+					System.out.println();
+					 for(Map.Entry<String,String> entry : statemap.entrySet())
+					   {
+						   String key = entry.getKey();
+						   String value = entry.getValue();  
+						   if(counName.equalsIgnoreCase(value))
+					     {
+							   System.out.println(counName);
+							   abbdata=abbdata.replace(counMatcher2.group(0),counMatcher2.group(0).replace(counMatcher2.group(1),key));
+							   System.out.println(abbdata);
+					     }
+				   }
+					 tx1FileContent=tx1FileContent.replace(abbMatcher.group(0), abbMatcher.group(0).replace(abbMatcher.group(8),abbdata));
+				}
+				 
+				
+			}
+
+		return tx1FileContent;
+
+	}
+
+	/**
+	 * Method is used to make section heading in Title case
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String title_Section_To_Sentense_Section(String tx1FileContent) {
+
+		Pattern titlePattern = Pattern
+				.compile("((((<p id=(.*?) class=\"at\">)|(<p class=\"at\" id=(.*?)>))(.*?)</p>))");
+		Matcher titleMatcher = titlePattern.matcher(tx1FileContent);
+		Pattern titlecapPattern = Pattern.compile("(:\\s[A-Za-z])");
+
+		if (titleMatcher.find()) {
+			String title = titleMatcher.group(8).toLowerCase().replace(".", "")
+					.trim();
+			title = Character.toUpperCase(title.charAt(0))
+					+ title.substring(1, title.length());
+			Matcher titlecapMatcher = titlecapPattern.matcher(title);
+			if (titlecapMatcher.find()) {
+				title = title.replaceFirst(titlecapMatcher.group(0),
+						titlecapMatcher.group(0).toUpperCase());
+			}
+			tx1FileContent = tx1FileContent
+					.replace(titleMatcher.group(0), titleMatcher.group(0)
+							.replace(titleMatcher.group(8), title));
+		}
+		return tx1FileContent;
+	}
+
+	/**
+	 * Method is used to change article title into sentence case
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String articleTitle_SentenceCase(String tx1FileContent) {
+		StringBuffer sb = new StringBuffer(tx1FileContent);
+		Pattern articlePattern = Pattern
+				.compile("<p id=\"editor_para_[0-9]+\"><span class=\"ref_lbl\">(.*?)</p>");
+		Matcher articleMatcher = articlePattern.matcher(sb);
+		Pattern refartPattern = Pattern
+				.compile("<span class=\"ref_atitle\">(.*?)</span>");
+		Pattern titlePattern = Pattern.compile("(^|\\.)\\s*(\\w)");
+
+		while (articleMatcher.find()) {
+			Matcher refartMatcher = refartPattern.matcher(articleMatcher
+					.group(0));
+			while (refartMatcher.find()) {
+
+				StringBuffer articledata = new StringBuffer(
+						refartMatcher.group(1));
+				Matcher titleMatcher = titlePattern.matcher(articledata);
+				while (titleMatcher.find())
+
+				{
+
+					String articleString = articledata.toString();
+					articledata.replace(titleMatcher.end() - 1, titleMatcher
+							.end(), titleMatcher.group(2).toUpperCase());
+
+					tx1FileContent = tx1FileContent.replace(articleString,
+							articledata);
+				}
+			}
+		}
+
+		return tx1FileContent;
+
+	}
+
+	/**
+	 * Method is used to highlight table caption
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String table_Sentence_Section(String tx1FileContent) {
+
+		Pattern tabSecPattern = Pattern
+				.compile("((((<p id=(.*?)?class=\"tab\">)|(<p class=\"tab\">))<span class=\"xps_label\">Table [0-9]+</span>\\.(.*?)</p>))");
+		Matcher tabSecMatcher = tabSecPattern.matcher(tx1FileContent);
+
+		while (tabSecMatcher.find()) {
+
+			String tablabel = tabSecMatcher.group(7);
+			if (!tablabel.trim().endsWith(".")) {
+				tx1FileContent = tx1FileContent.replace(tabSecMatcher.group(7),
+						"<span style=\"background-color:goldenrod;\">"
+								+ tabSecMatcher.group(7) + "." + "</span>");
+			}
+		}
+
+		return tx1FileContent;
+	}
+
+	/**
+	 * Method is used to highlight timing with ceCheck
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String highlightTiming(String tx1FileContent) {
+
+		Pattern timePattern = Pattern
+				.compile("(\\b(quarter past)\\b|(\\b([0-9]+:[0-9]+))\\s)");
+		Matcher timeMatcher = timePattern.matcher(tx1FileContent);
+		while (timeMatcher.find()) {
+
+			tx1FileContent = tx1FileContent.replace(timeMatcher.group(0),
+					"<span class=\"ceCheck\">" + timeMatcher.group(0)
+							+ "</span>");
+		}
+
+		return tx1FileContent;
+	}
+
+	/**
+	 * Method is used to check dot after fig
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+
+	public String figDotChecking(String tx1FileContent) {
+
+		Pattern figPattern = Pattern.compile("Fig[^\\.]\\b",
+				Pattern.UNICODE_CHARACTER_CLASS);
+		Matcher figMatcher = figPattern.matcher(tx1FileContent);
+		while (figMatcher.find()) {
+
+			// tx1FileContent = tx1FileContent.replaceAll(figMatcher.group(0),
+			// "FigData ");
+		}
+
+		return tx1FileContent;
+	}
+
+	/**
+	 * purpose of method is to fid exampla and that is (ie.
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String eg_Or_ie(String tx1FileContent) {
+
+		Pattern pPattern = Pattern
+				.compile("<(p)( id=\"([a-zA-Z_0-9]+)\")?( class=(.*?))( id=\"([a-zA-Z_0-9]+)\")?>(.*?)</\\1>");
+		Matcher pMatcher = pPattern.matcher(tx1FileContent);
+		Pattern egPattern = Pattern
+				.compile("((\\s\\be\\.g\\b\\s)|(\\se.g:\\s)|(\\s\\bi\\.e\\b\\s)|(\\si.e:\\s))");
+		while (pMatcher.find()) {
+			String pdata = pMatcher.group(8);
+			Matcher egMatcher = egPattern.matcher(pdata);
+			while (egMatcher.find()) {
+				// System.out.println(egMatcher.group(0));
+				if (egMatcher.group(0).contains(":")) {
+					tx1FileContent = tx1FileContent.replace(egMatcher.group(0),
+							egMatcher.group(0).replace(":", ".:"));
+				} else
+				{
+
+				}
+			}
+		}
+		// System.out.println(tx1FileContent);
+		return tx1FileContent;
+	}
+
+	/**
+	 * Method is used to apply dot at end of figure caption
+	 * 
+	 * @param tx1FileContent
+	 * @param ceObj
+	 * @param jidMap
+	 * @return String
+	 */
+	public String applyDotEndOfFigureCaption(String tx1FileContent,
+			CEBean ceObj, Map<String, String> jidMap) {
+
+		/*
+		 * Changing figure caption and label first.
+		 */
+		Pattern figureLabelCaptionPatter = Pattern
+				.compile(
+						"(<p class=\"fig\" id=\"editor_para_[0-9]+\"><span class=\"xps_label\">(Fig.|fig.|Fig|fig|figure|Figure|FIGURE)(\\s)?([0-9]+)(.|:)?</span>\\s?(.*?)(<span class=\"xps_Image\">gr[0-9]+</span>)?</p>)",
+						Pattern.CASE_INSENSITIVE);
+		// Pattern
+		// figureLabelCaptionPatter=Pattern.compile("(<p class=\"fig\"><span class=\"xps_label\">(Fig.|fig.|Fig|fig|figure|Figure|*?)</span>\\s?(.*?)(<span class=\"xps_Image\">gr[0-9]+</span>)?</p>)",Pattern.CASE_INSENSITIVE);
+		Matcher figureLabelCaptionMatcher = figureLabelCaptionPatter
+				.matcher(tx1FileContent);
+		StringBuffer figureCaptionContent = new StringBuffer();
+
+		while (figureLabelCaptionMatcher.find()) {
+			String figLabel = figureLabelCaptionMatcher.group(2);// .replaceAll("</?b>","");
+			String figCaption = figureLabelCaptionMatcher.group(6).trim();// .replaceAll("</?b>",
+																			// "");
+
+			if (!figCaption.trim().endsWith(".")) {
+				figCaption = figCaption + ".";
+			}
+			if (figLabel != null && jidMap != null
+					&& jidMap.get("model").toLowerCase().contains("model6")) {
+				figLabel = "Figure";
+
+			}
+			String figContent = figureLabelCaptionMatcher.group(0)
+					.replace(figureLabelCaptionMatcher.group(2), "figLabel")
+					.replace(figureLabelCaptionMatcher.group(6), figCaption);
+			figContent = Matcher.quoteReplacement(figContent);
+			figureLabelCaptionMatcher.appendReplacement(figureCaptionContent,
+					figContent);
+		}
+		figureLabelCaptionMatcher.appendTail(figureCaptionContent);
+
+		return figureCaptionContent.toString();
+	}
+
+	/**
+	 * Method is used to change tab or tab. into table
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String changeTabToTable(String tx1FileContent) {
+
+		/*
+		 * Changing tab 1 and tab. 1 to Table 1
+		 */
+		Pattern tabPat = Pattern
+				.compile("(tab|tab.|Tab|Tab.|TAB|TAB.)(\\s[0-9]+)");
+		Matcher tabMat = tabPat.matcher(tx1FileContent);
+		StringBuffer tabContent = new StringBuffer();
+
+		while (tabMat.find()) {
+
+			tabMat.appendReplacement(tabContent,
+					tabMat.group(0).replace(tabMat.group(1), "Table"));
+		}
+		tabMat.appendTail(tabContent);
+
+		return tabContent.toString();
+	}
+
+	/**
+	 * Method is used to change eq into chem id equation contain some bond
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String changeEqToChem(String tx1FileContent) {
+
+		/*
+		 * if equation contains bond then eq will change to chem
+		 */
+
+		Pattern eqPat = Pattern
+				.compile("<p class=\"(eq)\" id=\"editor_para_[0-9]+\">(.*?)</p>");
+		Matcher eqMat = eqPat.matcher(tx1FileContent);
+		StringBuffer eqContent = new StringBuffer();
+
+		while (eqMat.find()) {
+
+			if (eqMat.group(2).contains("glyph")) {
+				eqMat.appendReplacement(eqContent,
+						eqMat.group(0).replace(eqMat.group(1), "chem"));
+			}
+
+		}
+		eqMat.appendTail(eqContent);
+
+		return eqContent.toString();
+	}
+
+	/**
+	 * Method is used to check equation word at the end in eq class if it is
+	 * found then automatically convert into equation
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String changeDisplayEquationToeq(String tx1FileContent) {
+
+		/*
+		 * if display equation contains (equation 1) at the end of para then it
+		 * will change in (Eq. 1)
+		 */
+
+		Pattern eqPat = Pattern
+				.compile("<p class=\"(eq)\"(.*?)>(.*?)(\\((equation|equa) ?[0-9]\\))</p>");
+		Matcher eqMat = eqPat.matcher(tx1FileContent);
+		StringBuffer eqContent = new StringBuffer();
+
+		while (eqMat.find()) {
+
+			if (eqMat.group(4) != null) {
+				eqMat.appendReplacement(eqContent,
+						eqMat.group(0).replace(eqMat.group(5), "Eq."));
+			}
+
+		}
+		eqMat.appendTail(eqContent);
+		return eqContent.toString();
+	}
+
+	/**
+	 * Method is used to apply suffix tag if jr found in author name
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String changeJrSuffixTag(String tx1FileContent) {
+
+		Pattern auPat = Pattern
+				.compile("<span class=\"head_(gn|sn)\">(.*?)</span>");
+		Matcher auMat = auPat.matcher(tx1FileContent);
+		StringBuffer auContent = new StringBuffer();
+
+		while (auMat.find()) {
+
+			if (auMat.group(2) != null
+					&& auMat.group(1).equals("gn")
+					&& (auMat.group(2).toLowerCase().startsWith("jr ") || auMat
+							.group(2).toLowerCase().endsWith(" jr"))) {
+				auMat.appendReplacement(
+						auContent,
+						auMat.group(0).replace(
+								auMat.group(0),
+								"<span class=\"head_suffix\">Jr</span>"
+										+ auMat.group(0).replaceFirst(
+												"jr |Jr |JR |jr| jr| JR| Jr",
+												"")));
+			}
+			if (auMat.group(2) != null
+					&& auMat.group(1).equals("sn")
+					&& (auMat.group(2).toLowerCase().startsWith("jr ") || auMat
+							.group(2).toLowerCase().endsWith(" jr"))) {
+				auMat.appendReplacement(
+						auContent,
+						auMat.group(0)
+								.replace(
+										auMat.group(0),
+										auMat.group(0).replaceFirst(
+												"jr |Jr |JR |jr| jr| JR| Jr",
+												"")
+												+ "<span class=\"head_suffix\">Jr</span>"));
+			}
+
+		}
+		auMat.appendTail(auContent);
+
+		return auContent.toString();
+	}
+
+	/**
+	 * Method is used to convert numbered heading into unnumbered if article
+	 * model is model6
+	 * 
+	 * @param tx1FileContent
+	 * @param jidMap
+	 * @return String
+	 */
+	public String changeNumberedHeadingToUnnumbered(String tx1FileContent,
+			Map<String, String> jidMap) {
+
+		// for model 6 need to change numbered heading into unnumbered
+
+		Pattern headingPat = Pattern
+				.compile("<p class=\"h([1-9])\"(.*?)>([0-9\\.]+)(.*?)</p>");
+		Matcher headingMat = headingPat.matcher(tx1FileContent);
+		StringBuffer headingContent = new StringBuffer();
+		String model = jidMap.get("model");
+		if (model != null && model.contains("model6")) {
+
+			while (headingMat.find()) {
+
+				if (headingMat.group(3) != null) {
+
+					headingMat.appendReplacement(headingContent, headingMat
+							.group(0).replace(headingMat.group(3), ""));
+				}
+
+			}
+			headingMat.appendTail(headingContent);
+			tx1FileContent = headingContent.toString();
+		}
+
+		return tx1FileContent;
+	}
+
+	/**
+	 * Method is used to change PH into pH
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String PHFromPH(String tx1FileContent) {
+		Pattern phPattern = Pattern.compile("\\b(PH)\\b");
+		Matcher phMatcher = phPattern.matcher(tx1FileContent);
+		while (phMatcher.find()) {
+			tx1FileContent = tx1FileContent.replace(phMatcher.group(1), "pH");
+		}
+
+		return tx1FileContent;
+	}
+
+	/**
+	 * Method is used to convert vs. and versus according to majority
+	 * 
+	 * @param editorContent
+	 * @return String
+	 */
+	public String checkVsandVersus(String editorContent) {
+		int vscount = 0, vercount = 0;
+		Pattern vsPattern = Pattern.compile("(\\b(vs.)|(\\bversus\\b))");
+		Matcher vsMatcher = vsPattern.matcher(editorContent);
+		while (vsMatcher.find()) {
+			if (vsMatcher.group(0).equals("vs.")) {
+				vscount++;
+			}
+			if (vsMatcher.group(0).equals("versus")) {
+				vercount++;
+			}
+
+		}
+		Pattern vsPattern1 = Pattern.compile("(\\b(vs.)|(\\bversus\\b))");
+		Matcher vsMatcher1 = vsPattern1.matcher(editorContent);
+		while (vsMatcher1.find()) {
+			if (vercount > vscount) {
+				if (vsMatcher1.group().equals("vs.")) {
+
+					editorContent = editorContent.replaceAll("\\b(vs.)",
+							"versus");
+				}
+			} else if (vercount < vscount) {
+				if (vsMatcher1.group().equals("versus")) {
+					editorContent = editorContent.replaceAll("\\bversus\\b",
+							"vs.");
+
+				}
+			}
+		}
+
+		// System.out.println( editorContent);
+		return editorContent;
+	}
+
+	/**
+	 * Method is used to check no of references if more than 1 then Reference
+	 * heading will change into References
+	 * 
+	 * @param editorContent
+	 * @return String
+	 */
+	public String referenceToReferences(String editorContent) {
+		Pattern FigPattern = Pattern
+				.compile("<span class=\"ref_lbl\">(.*?)</span>");
+		Matcher FigMatcher = FigPattern.matcher(editorContent);
+		int count = 0;
+		while (FigMatcher.find()) {
+			count++;
+		}
+		Pattern RefPattern = Pattern
+				.compile("<(p)( id=\"([a-zA-Z_0-9]+)\")?( class=\"ref\")( id=\"([a-zA-Z_0-9]+)\")?>(.*?)</\\1>");
+		Matcher RefMatcher = RefPattern.matcher(editorContent);
+		if (RefMatcher.find()) {
+			if (count > 1 && RefMatcher.group(7).equalsIgnoreCase("Reference")) {
+				editorContent = editorContent.replace(
+						RefMatcher.group(0),
+						RefMatcher.group(0).replace(RefMatcher.group(7),
+								"References"));
+			}
+		}
+
+		// System.out.println(editorContent);
+		return editorContent;
+	}
+
+	/**
+	 * Method is used to change keyword into keywords if no. of keyword is more
+	 * than 1 otherwise it will be keyword
+	 * 
+	 * @param editorContent
+	 * @return String
+	 */
+	public String keyTokeysandkeysTokey(String editorContent) {
+		Pattern keyPattern = Pattern
+				.compile("<p ((id=\"editor_para_[0-9]+\")|(class=\"kwd\")) ((class=\"kwd\")|(role=\"keyword\")) ((role=\"keyword\")|(id=\"editor_para_[0-9]+\"))>(.*?)</p>");
+		Matcher keyMatcher = keyPattern.matcher(editorContent);
+		Pattern keycolPattern = Pattern.compile("[A-Za-z]+:");
+		Pattern keycountPattern = Pattern
+				.compile("<span class=\"keyword\">(.*?)</span>");
+		String keyname = "";
+		int count = 0;
+		while (keyMatcher.find()) {
+			String data = keyMatcher.group();
+			Matcher keycolMatcher = keycolPattern.matcher(data);
+			Matcher keycountMatcher = keycountPattern.matcher(data);
+			if (keycolMatcher.find()) {
+				keyname = keycolMatcher.group();
+			}
+			while (keycountMatcher.find()) {
+				count++;
+			}
+		}
+
+		Pattern keyPattern1 = Pattern
+				.compile("<p ((id=\"editor_para_[0-9]+\")|(class=\"kwd\")) ((class=\"kwd\")|(role=\"keyword\")) ((role=\"keyword\")|(id=\"editor_para_[0-9]+\"))>(.*?)</p>");
+		Matcher keyMatcher1 = keyPattern1.matcher(editorContent);
+		Pattern keycolPattern1 = Pattern.compile("([A-Za-z]+):");
+		while (keyMatcher1.find()) {
+			String indata = keyMatcher1.group(0);
+
+			Matcher keycolMatcher1 = keycolPattern1.matcher(indata);
+			while (keycolMatcher1.find()) {
+
+				if (count >= 1) {
+					if (keycolMatcher1.group(1).equals("Keyword")) {
+						editorContent = editorContent.replace(indata, indata
+								.replace(keycolMatcher1.group(1), "keywords"));
+					} else if (count <= 1) {
+						if (keycolMatcher1.group(1).equals("Keywords")) {
+							editorContent = editorContent.replace(indata,
+									indata.replace(keycolMatcher1.group(1),
+											"Keyword"));
+						}
+					}
+				}
+			}
+		}
+
+		return editorContent;
+	}
+
+	/**
+	 * Method is used to check content in ml:mi tag if length of content is
+	 * greater than one then ml:mi tag convert into ml:mtext tag. Also checking
+	 * space missing between multiple consecutive ml:mtext tag. if missing apply
+	 * space
+	 * 
+	 * @param txtContent
+	 * @param jidMap
+	 * @return String
+	 */
+	public String checkContentInEqMiTag(String txtContent,
+			Map<String, String> jidMap) {
+
+		Pattern eqPattern = Pattern
+				.compile("&lt;mml:mi&gt;(.*?)&lt;/mml:mi&gt;");
+		Matcher eqMatcher = eqPattern.matcher(txtContent);
+		StringBuffer sb = new StringBuffer();
+
+		while (eqMatcher.find()) {
+
+			String coundata = eqMatcher.group(1);
+
+			if (coundata != null && coundata.length() > 1) {
+				eqMatcher.appendReplacement(
+						sb,
+						eqMatcher.group(0).replace(eqMatcher.group(0),
+								"&lt;mml:mtext&gt;$1&lt;/mml:mtext&gt;"));
+			}
+
+		}
+
+		eqMatcher.appendTail(sb);
+
+		// if space is missing between multiple <mml:mtext>
+		Pattern mmtxtPattern = Pattern
+				.compile("&lt;/mml:mtext&gt;&lt;mml:mtext&gt;");
+		Matcher mmtxtMatcher = mmtxtPattern.matcher(sb.toString());
+		StringBuffer sbb = new StringBuffer();
+		while (mmtxtMatcher.find()) {
+
+			mmtxtMatcher.appendReplacement(
+					sbb,
+					mmtxtMatcher.group(0).replace("&lt;mml:mtext",
+							" &lt;mml:mtext"));
+
+		}
+		mmtxtMatcher.appendTail(sbb);
+
+		return sbb.toString();
+
+	}
+
+	/**
+	 * purpose of method is to find chemical equation content and then find some
+	 * chemical element like H2O CO2and fixed correct form of element
+	 * 
+	 * @param txtContent
+	 * @param jidMap
+	 * @return String
+	 */
+	public String checkContentInChem(String txtContent,
+			Map<String, String> jidMap) {
+
+		Pattern eqPattern = Pattern
+				.compile("<p( id=\"editor_para_[0-9]+\")? class=\"chem\"(.*?)>(.*?)</p>");
+		Matcher eqMatcher = eqPattern.matcher(txtContent);
+		StringBuffer sb = new StringBuffer();
+		while (eqMatcher.find()) {
+			String grp3 = eqMatcher.group(3);
+			if (grp3 != null && grp3.contains("H2O")) {
+				eqMatcher.appendReplacement(sb,
+						eqMatcher.group(0).replace("H2O", "H<sub>2</sub>O"));
+			}
+		}
+		eqMatcher.appendTail(sb);
+		return sb.toString();
+	}
+
+	/**
+	 * purpose of method is to first find h1,h2,h3... and find same heading
+	 * content in editorContent if it exist then <span
+	 * class=\"xps_sectionlinking\"> style should be apply.
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 */
+	public String sectionLinking(String tx1FileContent) {
+
+		Pattern secPattern = Pattern
+				.compile("<p( id=\"editor_para_[0-9]+\")? class=\"h[1-9]\"(.*?)>(Material and methods|Material and method|Materials and methods|Materials and method|Results|Result|Discussion|Discussions|Conclusion|Conclusions)</p>");
+		Matcher secMatcher = secPattern.matcher(tx1FileContent);
+		List<String> sectionList = new ArrayList<String>();
+		StringBuffer sb = new StringBuffer();
+		while (secMatcher.find()) {
+			if (secMatcher.group(3) != null && !secMatcher.group(3).equals("")) {
+
+				sectionList.add(secMatcher.group(3).trim());
+
+			}
+		}
+
+		Pattern contentPat = Pattern
+				.compile("<p( id=\"editor_para_[0-9]+\")? class=\"(txt|eq|textbox|)\"(.*?)>(.*?)</p>");
+		Matcher contentMatcher = contentPat.matcher(tx1FileContent);
+
+		while (contentMatcher.find()) {
+
+			String grp0 = contentMatcher.group(0);
+			for (String str : sectionList) {
+
+				if (grp0 != null && str != null && !str.equals("")
+						&& grp0.contains(str)) {
+
+					contentMatcher.appendReplacement(sb, grp0.replace(str,
+							"<span class=\"xps_sectionlinking\">" + str
+									+ "</span>"));
+				}
+
+			}
+
+		}
+		contentMatcher.appendTail(sb);
+
+		return sb.toString();
+
+	}
+
+	/**
+	 * Method is used to check some words which will go in fixed style like
+	 * Microsoft excel will always go as Microsoft Excel
+	 * 
+	 * @param txtContent
+	 * @param jidMap
+	 * @return String
+	 */
+	public String checkSomeFixedWord(String txtContent,
+			Map<String, String> jidMap) {
+
+		Map<String, String> words = new HashMap<String, String>();
+		words.put("Microsoft excel", "Microsoft Excel");
+		Iterator<?> iterator = words.entrySet().iterator();
+
+		while (iterator.hasNext()) {
+
+			@SuppressWarnings("rawtypes")
+			Map.Entry mapEntry = (Map.Entry) iterator.next();
+			String key = (String) mapEntry.getKey();
+			String val = (String) mapEntry.getValue();
+			if (txtContent.contains(key)) {
+				txtContent = txtContent.replaceAll(key, val);
+			}
+
+		}
+
+		return txtContent;
+	}
+
+	/**
+	 * Purpose of method is to take list of names from txt and check in editor
+	 * content if name exist more than one then 1st should be same and rest
+	 * should replace by its abbreviated name
+	 * 
+	 * @param tx1FileContent
+	 * @return String
+	 * @throws FileNotFoundException
+	 */
+	public String BinominalsNames(String tx1FileContent)
+			throws FileNotFoundException {
+		Scanner sc = new Scanner(new File("E:/cecheck/Binomial.txt")); // also
+																		// in
+																		// this
+																		// method
+																		// binomilaToItalic
+		//  Scanner sc = new Scanner(new File("Binomial.txt"));
+		Map<String, String> mapAuthor = new HashMap<String, String>();
+		while (sc.hasNextLine()) {
+			String str = sc.nextLine().trim();
+			String[] splitdata = str.split("=");
+			mapAuthor.put(splitdata[0].trim(), splitdata[1].trim());
+
+		}
+		for (String key : mapAuthor.keySet()) {
+			String value = mapAuthor.get(key);
+
+			if (tx1FileContent != null && tx1FileContent.contains(key)) {
+
+				tx1FileContent = tx1FileContent.replaceFirst(key, "###***");
+				tx1FileContent = tx1FileContent.replaceAll(key, value);
+				tx1FileContent = tx1FileContent.replace("###***", key);
+			}
+		}
+		return tx1FileContent;
+	}
+
+	public String SIUnits(String tx1FileContent) {
+
+		
+		Pattern refpat = Pattern.compile("(<p id=\"editor_para_(.*?)\"><span class=\"ref_lbl\">(.*?)</p>|(<p id=\"editor_para_[0-9]+\" class=\"del_ref\">(.*?)</p>|<p class=\"del_ref\" id=\"editor_para_[0-9]+\">(.*?)</p>))");
+		Matcher refMat = refpat.matcher(tx1FileContent);
+	    StringBuffer refdata=new StringBuffer();
+		while(refMat.find()){
+			refdata.append(refMat.group(0)); 
+			tx1FileContent=tx1FileContent.replace(refMat.group(0),"");
+		}
+
+		
+		
+		TreeMap<String, String> statemap = new TreeMap();
+		statemap.put("minutes", "min");
+		statemap.put("minute", "min");
+		statemap.put("seconds", "s");
+		statemap.put("second", "s");
+		statemap.put("milligram", "mg");
+		statemap.put("grams", "g");
+		statemap.put("gram", "g");
+		statemap.put("litre", "l");
+		statemap.put("liter", "l");
+		statemap.put("hours", "h");
+		statemap.put("hr", "h");
+		statemap.put("milliliters", "mL");
+		statemap.put("Kilograms", "kg");
+		statemap.put("Kilogram", "kg");
+		for (Map.Entry<String, String> entry : statemap.entrySet()) {
+			String key = entry.getKey();
+			String value = entry.getValue();
+			Pattern SIPattern = Pattern
+					.compile("<span class=\"xps_thinspace\">&#8201;</span>("
+							+ key + ")\\b");
+			Matcher SImatcher = SIPattern.matcher(tx1FileContent);
+			while (SImatcher.find()) {
+				System.out.println(SImatcher.group(0));
+				tx1FileContent = tx1FileContent.replace(SImatcher.group(),
+						"<span class=\"xps_thinspace\">&#8201;</span>" + value);
+			}
+
+			Pattern SIPat = Pattern.compile("[0-9]+(\\s(" + key + "))\\b");
+			Matcher SImat = SIPat.matcher(tx1FileContent);
+			while (SImat.find()) {
+				System.out.println(SImat.group(0));
+				tx1FileContent = tx1FileContent.replace(SImat.group(0),SImat.group(0).replace(SImat.group(1),"<span class=\"xps_thinspace\">&#8201;</span>" + value));
+			}
+
+		}
+		Pattern SIPattern = Pattern
+				.compile("[0-9]+(<span class=\"xps_thinspace\">&#8201;</span>Pa)|\\sdyne\\b");
+		Matcher SImatcher = SIPattern.matcher(tx1FileContent);
+		int Pacount = 0, dyncount = 0, queryId = 90;
+		while (SImatcher.find()) {
+			if (SImatcher.group(0).contains("Pa")) {
+				Pacount++;
+			}
+			if (SImatcher.group(0).contains("dyne")) {
+				dyncount++;
+			}
+		}
+		System.out.println(Pacount + "---------" + dyncount);
+		Pattern SPattern = Pattern
+				.compile("[0-9]+(<span class=\"xps_thinspace\">&#8201;</span>Pa)|\\sdyne\\b");
+		Matcher Smatcher = SPattern.matcher(tx1FileContent);
+		if (Smatcher.find()) {
+			if (Pacount > 0 == dyncount > 0) {
+				tx1FileContent = tx1FileContent
+						.replace(
+								Smatcher.group(0),
+								Smatcher.group(0)
+										.replace(
+												Smatcher.group(1),
+												"<span class=\"mceNonEditable\"><span id=\"QRY"
+														+ queryId++
+														+ "\" class=\"QRY0\">&lt;!--&lt;query&gt; Kindly check Pa and dyn both used for Pressure &lt;/query&gt;--&gt;</span></span>"
+														+ Smatcher.group(1)));
+			}
+		}
+		
+		
+		
+		Pattern rpat = Pattern.compile("<p (class=\"ref\" id=\"editor_para_[0-9]+\")?(id=\"editor_para_[0-9]+\" class=\"ref\")?>References</p>");
+		Matcher rMat = rpat.matcher(tx1FileContent); 
+		while(rMat.find()){
+			//System.out.println(rMat.group(0));
+			System.out.println(rMat.group(0)+refdata);
+			tx1FileContent=tx1FileContent.replaceFirst(rMat.group(0), rMat.group(0)+refdata);
+		}
+		
+		
+
+		return tx1FileContent;
+	}
+
+	public String casingInTable(String tx1FileContent) {
+		Pattern tablePattern = Pattern
+				.compile("<tbody>(?:(?>[^<]+)|<(?!tbody\b[^>]*>))*?</tbody>");
+		Matcher tablematcher = tablePattern.matcher(tx1FileContent);
+		Pattern cellPattern = Pattern
+				.compile("<p (id=\"editor_para_[0-9]+\" class=\"txt\"|class=\"txt\" id=\"editor_para_[0-9]+\")>([a-zA-Z\\s0-9]+)</p>");
+		while (tablematcher.find()) {
+			String pdata = tablematcher.group(0);
+			// System.out.println(tablematcher.group(0));
+			Matcher cellmatcher = cellPattern.matcher(pdata);
+			while (cellmatcher.find()) {
+				System.out.println(cellmatcher.group(0));
+				String paradata = cellmatcher.group(0);
+				String celldata = cellmatcher.group(2).toLowerCase();
+				String Udata = celldata.replaceFirst(celldata.substring(0, 1),
+						celldata.substring(0, 1).toUpperCase());
+				System.out.println(celldata);
+				tx1FileContent = tx1FileContent.replace(paradata,
+						paradata.replace(cellmatcher.group(2), Udata));
+			}
+
+		}
+		
+		
+		
+		
+		
+		return tx1FileContent;
+
+	}
+
+	public String tabelLabelDot(String tx1FileContent) {
+		Pattern tabpat = Pattern
+				.compile("<p( id=\"([a-zA-Z_0-9]+)\")?( class=\"tab\")( id=\"([a-zA-Z_0-9]+)\")?><span(.*?)>(.*?)</span>[|\\.](.*?)</p>");
+		Matcher tabmat = tabpat.matcher(tx1FileContent);
+		Pattern tabpat1 = Pattern.compile(":\\s[a-z]");
+		while (tabmat.find()) {
+			String data = tabmat.group(8).toLowerCase();
+			// System.out.println(data+"-------------");
+			Matcher tabmat1 = tabpat1.matcher(data);
+			if (tabmat1.find()) {
+				String repdata = tabmat1.group(0);
+				data = data.replaceFirst(repdata, repdata.toUpperCase());
+			}
+			// System.out.println(data);
+			if (!data.contains(".")) {
+				// System.out.println(repdata.toUpperCase());
+				tx1FileContent = tx1FileContent.replace(tabmat.group(0), tabmat
+						.group(0).replace(tabmat.group(8), data + "."));
+			}
+			if (data.contains(".")) {
+				tx1FileContent = tx1FileContent.replace(tabmat.group(0), tabmat
+						.group(0).replace(tabmat.group(8), data));
+			}
+		}
+		return tx1FileContent;
+	}
+
+	public String percentToSymbol(String tx1FileContent) {
+		Pattern perpat = Pattern.compile("([0-9]+)(\\spercent)");
+		Matcher permat = perpat.matcher(tx1FileContent);
+		while (permat.find()) {
+			String matdata = permat.group(2);
+
+			tx1FileContent = tx1FileContent.replace(permat.group(0), permat
+					.group(0).replace(permat.group(2), "%"));
+		}
+		return tx1FileContent;
+	}
+
+	public String hyphenToto(String tx1FileContent) {
+		Pattern perpat = Pattern.compile("([0-9]+)% (-) ([0-9]+)%");
+		Matcher permat = perpat.matcher(tx1FileContent);
+		while (permat.find()) {
+			String matdata = permat.group(2);
+			// System.out.println(matdata);
+			tx1FileContent = tx1FileContent.replace(permat.group(0), permat
+					.group(0).replace(permat.group(2), "to"));
+		}
+		Pattern per1pat = Pattern
+				.compile("(([A-Z]<sub>[0-9]+</sub>) (-) ([A-Z]<sub>[0-9]+</sub>))");
+		Matcher per1mat = per1pat.matcher(tx1FileContent);
+		while (per1mat.find()) {
+			String matdata1 = per1mat.group();
+			// System.out.println(matdata1);
+			tx1FileContent = tx1FileContent.replace(per1mat.group(0), per1mat
+					.group(0).replace(per1mat.group(3), "to"));
+		}
+		return tx1FileContent;
+	}
+
+	public String dotToColoninTime(String tx1FileContent) {
+		Pattern refpat = Pattern.compile("(<p id=\"editor_para_(.*?)\"><span class=\"ref_lbl\">(.*?)</p>|(<p id=\"editor_para_[0-9]+\" class=\"del_ref\">(.*?)</p>|<p class=\"del_ref\" id=\"editor_para_[0-9]+\">(.*?)</p>))");
+		Matcher refMat = refpat.matcher(tx1FileContent);
+	    StringBuffer refdata=new StringBuffer();
+		while(refMat.find()){
+			refdata.append(refMat.group(0)); 
+			tx1FileContent=tx1FileContent.replace(refMat.group(0),"");
+		}
+
+		
+		Pattern colpat = Pattern.compile("\\b[0-9]+(\\.)[0-9]+\\s(am|pm)\\b");
+		Matcher colmat = colpat.matcher(tx1FileContent);
+		while (colmat.find()) {
+			String matdata = colmat.group(1);
+			System.out.println(matdata);
+			tx1FileContent = tx1FileContent.replace(colmat.group(0), colmat
+					.group(0).replace(colmat.group(1), ":"));
+		}
+		Pattern rpat = Pattern.compile("<p (class=\"ref\" id=\"editor_para_[0-9]+\")?(id=\"editor_para_[0-9]+\" class=\"ref\")?>References</p>");
+		Matcher rMat = rpat.matcher(tx1FileContent); 
+		while(rMat.find()){
+			//System.out.println(rMat.group(0));
+			tx1FileContent=tx1FileContent.replaceFirst(rMat.group(0), rMat.group(0)+refdata);
+		}
+		return tx1FileContent;
+	}
+
+	public String CH3SHHyphenRemove(String tx1FileContent) {
+		Pattern colspat = Pattern.compile("(-)((CH<sub>[0-9]+</sub>)|(SH)\\b)",
+				Pattern.CASE_INSENSITIVE);
+		Pattern ccolspat = Pattern.compile("(\\bC(-)C\\b)",
+				Pattern.CASE_INSENSITIVE);
+		Matcher colsmat = colspat.matcher(tx1FileContent);
+
+		while (colsmat.find()) {
+			String matdata = colsmat.group(1);
+			// System.out.println(matdata);
+			tx1FileContent = tx1FileContent
+					.replace(
+							colsmat.group(0),
+							colsmat.group(0)
+									.replace(
+											colsmat.group(1),
+											"<img src=\"../../signin/onlinecontribution/editor/glyphimg/glyph2.jpg\" alt=\"glyph2\" width=\"31\" height=\"27\" />"));
+		}
+		Matcher ccolsmat = ccolspat.matcher(tx1FileContent);
+
+		while (ccolsmat.find()) {
+			String matdata = ccolsmat.group(2);
+			System.out.println(matdata);
+			tx1FileContent = tx1FileContent
+					.replace(
+							ccolsmat.group(0),
+							ccolsmat.group(0)
+									.replace(
+											ccolsmat.group(2),
+											"<img src=\"../../signin/onlinecontribution/editor/glyphimg/glyph2.jpg\" alt=\"glyph2\" width=\"31\" height=\"27\" />"));
+		}
+		return tx1FileContent;
+	}
+
+	public String headingcheck(String tx1FileContent) {
+
+		Pattern cappat = Pattern
+				.compile("<p( id=\"([a-zA-Z_0-9]+)\")?( class=\"h[0-9]\")( id=\"([a-zA-Z_0-9]+)\")?>(.*?)</p>");
+		Matcher capmat = cappat.matcher(tx1FileContent);
+		Pattern bracketpat = Pattern.compile("\\(\\b(.*?)\\b\\)");
+		Pattern capdata = Pattern.compile("[0-9]+\\s[^\\d]");
+		Pattern cap = Pattern.compile("\\b[A-Z]+\\b");
+		try {
+			while (capmat.find()) {
+
+				String data = capmat.group(6).toLowerCase();
+				Matcher bracketmat = bracketpat.matcher(data);
+				while (bracketmat.find()) {
+					// System.out.println(bracketmat.group().toUpperCase());
+					data = data.replace(bracketmat.group(0), bracketmat
+							.group(0).toUpperCase());
+				}
+				Matcher cappmat = capdata.matcher(data);
+				while (cappmat.find()) {
+					data = data.replace(cappmat.group(), cappmat.group()
+							.toUpperCase());
+				}
+				String odata = capmat.group(6);
+				Matcher pcapmat = cap.matcher(odata);
+
+				while (pcapmat.find()) {
+					String sd = pcapmat.group();
+
+					data = data.replaceAll("\\b" + sd.toLowerCase() + "\\b", sd
+							+ " ");
+				}
+				// System.out.println(data);
+				tx1FileContent = tx1FileContent.replace(capmat.group(0), capmat
+						.group(0).replace(capmat.group(6), data));
+			}
+		} catch (Exception e) {
+			logger.info("headingcheck......" + e);
+		}
+		return tx1FileContent;
+	}
+
+	public String betweenTotoAnd(String tx1FileContent) {
+		
+		Pattern refpat = Pattern.compile("(<p id=\"editor_para_(.*?)\"><span class=\"ref_lbl\">(.*?)</p>|(<p id=\"editor_para_[0-9]+\" class=\"del_ref\">(.*?)</p>|<p class=\"del_ref\" id=\"editor_para_[0-9]+\">(.*?)</p>))");
+		Matcher refMat = refpat.matcher(tx1FileContent);
+	    StringBuffer refdata=new StringBuffer();
+		while(refMat.find()){
+			refdata.append(refMat.group(0)); 
+			tx1FileContent=tx1FileContent.replace(refMat.group(0),"");
+		}
+
+		
+		
+		
+		Pattern betpat = Pattern.compile("between\\s[0-9]+\\s(to)\\s[0-9]+\\b");
+		Matcher betmat = betpat.matcher(tx1FileContent);
+		try {
+			while (betmat.find()) {
+				String data = betmat.group(1);
+				System.out.println(betmat.group(1));
+				tx1FileContent = tx1FileContent.replace(betmat.group(0), betmat
+						.group(0).replace(data, "and"));
+
+			}
+		} catch (Exception ee) {
+			logger.info("betweenTotoAnd......" + ee);
+		}
+		
+		Pattern betpat1 = Pattern.compile("between\\s[0-9]+(&#8211;|-|<span class=\"xps_ndash\">&#8211;</span>)[0-9]+\\b"); 		 
+		Matcher betmat1 = betpat1.matcher(tx1FileContent);
+		while(betmat1.find()){ 
+			String data=betmat1.group(1);
+			System.out.println(betmat1.group(1));
+			 tx1FileContent=tx1FileContent.replace(betmat1.group(0),betmat1.group(0).replace(data, " and ")); 
+		}
+		
+		Pattern rpat = Pattern.compile("<p (class=\"ref\" id=\"editor_para_[0-9]+\")?(id=\"editor_para_[0-9]+\" class=\"ref\")?>References</p>");
+		Matcher rMat = rpat.matcher(tx1FileContent); 
+		while(rMat.find()){
+			//System.out.println(rMat.group(0));
+			tx1FileContent=tx1FileContent.replaceFirst(rMat.group(0), rMat.group(0)+refdata);
+		}
+		
+		return tx1FileContent;
+	}
+
+	public String capsCheckinAllheading(String tx1FileContent) {
+		Pattern betpat = Pattern
+				.compile("(<p class=\"h[0-9]\" role=\"grey\" id=\"editor_para_[0-9]+\">|<p id=\"editor_para_[0-9]+\" class=\"h[0-9]\" role=\"grey\">)(.*?)</p>");
+		Matcher betmat = betpat.matcher(tx1FileContent);
+		try {
+			while (betmat.find()) {
+
+				String data = betmat.group(2)
+						.replaceAll("((\\b[0-9]+\\.[0-9]+\\b)|(\\d))", "")
+						.trim().toLowerCase();
+				data = Character.toUpperCase(data.charAt(0))
+						+ data.substring(1, data.length());
+				System.out.println(data);
+				tx1FileContent = tx1FileContent
+						.replace(
+								betmat.group(0),
+								betmat.group(0).replace(
+										betmat.group(2),
+										betmat.group(2).replace(
+												betmat.group(2), data)));
+
+			}
+		} catch (Exception ee) {
+			logger.info("capsCheckinAllheading......" + ee);
+		}
+		return tx1FileContent;
+	}
+
+	public String doublequotesinlongestString(String tx1FileContent) {
+
+		Pattern betpat = Pattern
+				.compile("[0-9]+&#[0-9]+;(|\\s)[0-9]+&#[0-9]+;\\d+\\.\\d+(&#[0-9]+;')[A-Za-z]");
+		Matcher betmat = betpat.matcher(tx1FileContent);
+		while (betmat.find()) {
+			tx1FileContent = tx1FileContent.replace(betmat.group(0), betmat
+					.group(0).replace(betmat.group(2), "&#8243;"));
+		}
+		return tx1FileContent;
+	}
+
+	public String frenchCityToEnglishCity(String txtContent) {
+		Session session = DBConnectionProvider.getSession();
+		session.beginTransaction();
+
+		Pattern countryPattern = Pattern
+				.compile("((((<p id=(.*?) class=\"saff\">)|(<p class=\"saff\" id=(.*?)>))(.*?)</p>))");
+		Matcher countryMatcher = countryPattern.matcher(txtContent);
+
+		Pattern namePattern = Pattern
+				.compile("<span class=\"xps_country\">(.*?)</span>");
+
+		String country = "";
+		try {
+			while (countryMatcher.find()) {
+
+				String coundata = countryMatcher.group(0);
+
+				Matcher nameMatcher = namePattern.matcher(coundata);
+				while (nameMatcher.find()) {
+
+					String cname = nameMatcher.group(1);
+					String fullnamematcher = nameMatcher.group(0);
+
+					try {
+
+						StringBuilder qryBuilder = new StringBuilder(
+								"select c.countrynameinenglish from CountryList c where c.countrynameinfrench='"
+										+ cname.trim() + "'");
+
+						Query query = session.createSQLQuery(qryBuilder
+								.toString().trim());
+
+						if (query != null && query.list() != null
+								&& query.list().size() > 0) {
+							country = query.uniqueResult().toString();
+							txtContent = txtContent.replace(fullnamematcher,
+									fullnamematcher.replace(cname, country));
+						} else {
+								int queryId=0;
+							StringBuilder qryBuilder1 = new StringBuilder(
+									"select c.countrynameinenglish from CountryList c where c.countrynameinenglish='"
+											+ cname.trim() + "'");
+
+							Query query1 = session.createSQLQuery(qryBuilder1
+									.toString().trim());
+
+							if (query1 != null && query1.list() != null
+									&& query1.list().size() > 0) {
+								country = query1.uniqueResult().toString();
+								System.out.println(country);
+							} else{
+	txtContent = txtContent.replace(fullnamematcher,fullnamematcher.replace(cname,"<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Kindly check country name is not present in the Country List&lt;/query&gt;--&gt;</span></span>"+cname));
+							}
+							
+						
+						}
+
+					} catch (Exception he) {
+						he.printStackTrace();
+					}
+				}
+
+			}
+		} catch (Exception ee) {
+			logger.info("frenchCityToEnglishCity......" + ee);
+		}
+		// System.out.println(txtContent);
+		return txtContent;
+	}
+
+	public String fullCitytoAbbrCity(String txtContent) {
+		Session session = DBConnectionProvider.getSession();
+		session.beginTransaction();
+
+		Pattern countryPattern = Pattern
+				.compile("((((<p id=(.*?) class=\"saff\">)|(<p class=\"saff\" id=(.*?)>))(.*?)</p>))");
+		Matcher countryMatcher = countryPattern.matcher(txtContent);
+
+		Pattern namePattern = Pattern
+				.compile("<span class=\"xps_city\">(.*?)</span>");
+
+		String country = "";
+		while (countryMatcher.find()) {
+
+			String coundata = countryMatcher.group(0);
+
+			Matcher nameMatcher = namePattern.matcher(coundata);
+			while (nameMatcher.find()) {
+
+				String cname = nameMatcher.group(1);
+				String fullnamematcher = nameMatcher.group(0);
+
+				try {
+
+					StringBuilder qryBuilder = new StringBuilder(
+							"SELECT abbcity FROM city where city='"
+									+ cname.trim() + "' and countrycode='US'");
+
+					Query query = session.createSQLQuery(qryBuilder.toString()
+							.trim());
+
+					if (query != null && query.list() != null
+							&& query.list().size() > 0) {
+						country = query.uniqueResult().toString();
+						txtContent = txtContent.replace(fullnamematcher,
+								fullnamematcher.replace(cname, country));
+					} else {
+
+						// txtContent=txtContent.replace(fullnamematcher,
+						// fullnamematcher.replace(cname,
+						// "<span class=\"mceNonEditable\"><span id=\"QRY"+queryId+++"\" class=\"QRY0\">&lt;!--&lt;query&gt; Kindly check country name is not present in the list&lt;/query&gt;--&gt;</span>"+cname));
+					}
+
+				} catch (Exception ee) {
+					logger.info("nameMatcher......" + ee);
+				}
+			}
+		}
+
+		return txtContent;
+	}
+
+	public String fullJtitleToAbbrJtitle(String txtContent) {
+		Session session = DBConnectionProvider.getSession();
+		session.beginTransaction();
+		Pattern namePattern = Pattern
+				.compile("<span class=\"ref_jtitle\">(.*?)</span>");
+
+		String country = "";
+		Matcher nameMatcher = namePattern.matcher(txtContent);
+		while (nameMatcher.find()) {
+
+			String cname = nameMatcher.group(1);
+
+			String fullnamematcher = nameMatcher.group(0);
+
+			try {
+
+				StringBuilder qryBuilder = new StringBuilder(
+						"select jtitleabbr from JOURNALABBREVIATION where jtitlefull='"
+								+ cname.trim() + "'");
+				Query query = session.createSQLQuery(qryBuilder.toString()
+						.trim());
+				if (query != null && query.list() != null
+						&& query.list().size() > 0) {
+					country = query.uniqueResult().toString();
+					System.out.println(fullnamematcher.replace(cname, country));
+					txtContent = txtContent.replace(fullnamematcher,
+							fullnamematcher.replace(cname, country));
+				}
+
+			} catch (Exception he) {
+				he.printStackTrace();
+			}
+		}
+
+		System.out.println(txtContent);
+		return txtContent;
+	}
+
+	public String tableStrongdataCaps(String tx1FileContent) {
+
+		Pattern betpat = Pattern.compile("<table.*?>(.*?)</table>.*?",
+				Pattern.DOTALL);
+		Matcher betmat = betpat.matcher(tx1FileContent);
+
+		Pattern ppat = Pattern.compile("<p(.*?)><strong>(.*?)</strong>");
+		Pattern cppat = Pattern.compile("\\b[A-Z]+\\b");
+
+		while (betmat.find()) {
+			String data = betmat.group(0);
+			// System.out.println(data+"--------");
+			Matcher pmat = ppat.matcher(data);
+			while (pmat.find()) {
+				String data1 = pmat.group(2);
+				// System.out.println(pmat.group(0));
+				// System.out.println(pmat.group(2));
+				String cutdata = pmat.group(2).replaceAll("(\\(.*?\\))", "")
+						.replaceAll("\\<[^\\>]*\\>", "");
+				// System.out.println(cutdata);
+				boolean upperCase = cutdata.equals(cutdata.toUpperCase());
+				if (!upperCase) {
+					String sdata = cutdata.toLowerCase();
+					Matcher ss = cppat.matcher(cutdata);
+					if (ss.find()) {
+						String gh = ss.group();
+						sdata = Character.toUpperCase(sdata.charAt(0))
+								+ sdata.substring(1, sdata.length());
+						cutdata = cutdata.replaceFirst(cutdata, sdata);
+						sdata = sdata.replaceFirst(sdata, sdata.replaceFirst(
+								gh.toLowerCase(), ss.group()));
+						// System.out.println(sdata);
+						tx1FileContent = tx1FileContent.replace(pmat.group(0),
+								pmat.group(0).replace(pmat.group(2), sdata));
+					} else {
+						sdata = Character.toUpperCase(sdata.charAt(0))
+								+ sdata.substring(1, sdata.length());
+						tx1FileContent = tx1FileContent.replace(pmat.group(0),
+								pmat.group(0).replace(pmat.group(2), sdata));
+						// System.out.println(sdata);
+					}
+				} else {
+					// System.out.println(cutdata);
+					tx1FileContent = tx1FileContent.replace(pmat.group(0), pmat
+							.group(0).replace(pmat.group(2), cutdata));
+				}
+			}
+		}
+
+		return tx1FileContent;
+	}
+
+	public String binomilaToItalic(String tx1FileContent) {
+
+		 // String tx1FilePath="italicbinomial.txt",filedata="";
+
+		String tx1FilePath = "E:/cecheck/italicbinomial.txt", filedata = "";
+		try {
+			filedata = FileUtils.readFileToString(new File(tx1FilePath));
+		} catch (IOException fe) {
+			fe.printStackTrace();
+		}
+		if (filedata != "" || filedata != " " || filedata != null) {
+			String[] ardata = filedata.split("\n");
+
+			for (int i = 0; i < ardata.length; i++) {
+				// System.out.println(ardata[i]);
+				if (ardata[i] != "" || ardata[i] != " " || ardata[i] != null) {
+					Pattern betpat = Pattern.compile(ardata[i].trim(),
+							Pattern.CASE_INSENSITIVE);
+					Matcher betmat = betpat.matcher(tx1FileContent);
+					while (betmat.find()) {
+						// System.out.println(betmat.group(0));
+						tx1FileContent = tx1FileContent.replace(
+								betmat.group(0), "<em>" + betmat.group(0)
+										+ "</em>");
+					}
+
+				}
+			}
+		}
+		return tx1FileContent;
+	}
+
+	public String ArcSecORMinToSymbolconverter(String tx1FileContent) {
+		  
+		Pattern arcPattern1 = Pattern.compile("\\s[0-9]+(\\sarcminutes\\b|\\sarcminute\\b|\\sarcmin\\b)",Pattern.CASE_INSENSITIVE);
+		Matcher arcMatcher = arcPattern1.matcher(tx1FileContent); 
+		while ( arcMatcher.find() ) {  
+		// 	System.out.println(arcMatcher.group(1));
+			tx1FileContent=tx1FileContent.replace(arcMatcher.group(0),arcMatcher.group(0).replaceAll(arcMatcher.group(1),"&#8242;"));
+			
+		}
+		Pattern arcPattern11 = Pattern.compile("\\s[0-9]+(<span class=\"xps_thinspace\">&#8201;</span>(arcminutes\\b|arcminute\\b|arcmin\\b))",Pattern.CASE_INSENSITIVE);
+		Matcher arcMatcher1 = arcPattern11.matcher(tx1FileContent); 
+		while ( arcMatcher1.find() ) {  
+		 	System.out.println(arcMatcher1.group(1));
+		 	tx1FileContent=tx1FileContent.replace(arcMatcher1.group(0),arcMatcher1.group(0).replaceAll(arcMatcher1.group(1),"&#8242;"));
+			
+		}
+		Pattern arcPattern12 = Pattern.compile("\\s[0-9]+(\\sarcseconds\\b|\\sarcsecond\\b|\\sarcsec\\b)",Pattern.CASE_INSENSITIVE);
+		Matcher arcMatcher2 = arcPattern12.matcher(tx1FileContent); 
+		while ( arcMatcher2.find() ) {  
+		// 	System.out.println(arcMatcher2.group(1));
+			tx1FileContent=tx1FileContent.replace(arcMatcher2.group(0),arcMatcher2.group(0).replaceAll(arcMatcher2.group(1),"&#8243;"));
+			
+		}
+		
+		Pattern arcPattern112 = Pattern.compile("\\s[0-9]+(<span class=\"xps_thinspace\">&#8201;</span>(arcseconds\\b|arcsecond\\b|arcsec\\b))",Pattern.CASE_INSENSITIVE);
+		Matcher arcMatcher12 = arcPattern112.matcher(tx1FileContent); 
+		while ( arcMatcher12.find() ) {  
+		  	System.out.println(arcMatcher12.group(1));
+		 	tx1FileContent=tx1FileContent.replace(arcMatcher12.group(0),arcMatcher12.group(0).replaceAll(arcMatcher12.group(1),"&#8243;"));
+			
+		}
+		
+		return tx1FileContent;
+	}
+
+	public String keywordsToSentenceCase(String tx1FileContent) {
+		Pattern kwdMat = Pattern.compile("<p (.*?)>Keywords:\\s(.*?)</p>");
+		try {
+			Matcher kwdMat1 = kwdMat.matcher(tx1FileContent);
+			while (kwdMat1.find()) {
+				// System.out.println(kwdMat1.group(2).replaceAll(";\\s",";"));
+				Pattern subkwdPat = Pattern
+						.compile("<span class=\"keyword\">(.*?)</span>");
+				Matcher subkwdMat = subkwdPat.matcher(kwdMat1.group(2)
+						.replaceAll(";\\s", ";"));
+				while (subkwdMat.find()) {
+					// System.out.println(subkwdMat.group());
+					String temp = "";
+					String unemdata = subkwdMat.group(1).replace("<em>", "")
+							.replace("</em>", "").trim();
+					temp = subkwdMat.group(1).replace("<em>", "")
+							.replace("</em>", "").trim();
+					String sdata = temp.trim();
+					String gh[] = temp.split(" ");
+					for (int i = 0; i < gh.length; i++) {
+						boolean upperCase1 = gh[i].equals(gh[i].toUpperCase());
+						// System.out.println(gh[i]);
+						if (upperCase1) {
+							String data = gh[i];
+							temp = temp.toLowerCase();
+							if (temp.toLowerCase().contains(data.toLowerCase())) {
+								// System.out.println(gh[i]);
+								sdata = sdata.replace(gh[i].toLowerCase(),
+										data.toUpperCase() + " ".trim());
+							}
+						} else {
+							if (temp.toLowerCase()
+									.contains(gh[i].toLowerCase())) {
+								String indata = gh[i];
+								// System.out.println(gh[i]);
+								sdata = sdata.replaceFirst(indata,
+										gh[i].toLowerCase() + " ".trim());
+							}
+						}
+					}
+					sdata = Character.toUpperCase(sdata.charAt(0))
+							+ sdata.substring(1, sdata.length());
+					// System.out.println(sdata);
+					// System.out.println(temp);
+					// System.out.println(subkwdMat.group(0));
+					// System.out.println(subkwdMat.group(1));
+					// System.out.println(subkwdMat.group(0).trim().replace(unemdata,sdata.trim()).trim());
+					tx1FileContent = tx1FileContent.replace(
+							subkwdMat.group(0),
+							subkwdMat.group(0).trim()
+									.replace(unemdata, sdata.trim()).trim());
+				}
+
+			}
+			// System.out.println(tx1FileContent);
+		} catch (Exception e) {
+			System.out.println(e);
+		}
+
+		return tx1FileContent;
+	}
+
+	public String testingkeywordsort(String tx1FileContent) {
+
+		Pattern keywordPattern = Pattern
+				.compile("<p (id=\"editor_para_[0-9]+\"|class=\"kwd\") (class=\"kwd\"|role=\"keyword\") (role=\"keyword\"|id=\"editor_para_[0-9]+\")>Keywords: (.*?)</p>");
+		Matcher kwdMat = keywordPattern.matcher(tx1FileContent);
+		Pattern keywordPattern1 = Pattern
+				.compile("<span class=\"keyword\">(.*?)</span>");
+		Map m1 = new HashMap();
+		List l1 = new ArrayList();
+		System.out.println(l1);
+		while (kwdMat.find()) {
+			Matcher kwdMat1 = keywordPattern1.matcher(kwdMat.group(4));
+			while (kwdMat1.find()) {
+				String data = kwdMat1.group(1).replace("<em>", "")
+						.replace("</em>", "");
+				m1.put(kwdMat1.group(0), data);
+				l1.add(kwdMat1.group(0));
+				System.out.println(kwdMat1.group(0));
+				
+			}
+
+		}
+
+		Map sortedMap = sortByComparator(m1);
+		return printMap(sortedMap, tx1FileContent);
+
+	}
+
+	private static Map sortByComparator(Map m1) {
+
+		List<Map.Entry<String, String>> list = new LinkedList<Map.Entry<String, String>>(
+				m1.entrySet());
+		Collections.sort(list, new Comparator<Map.Entry<String, String>>() {
+			public int compare(Map.Entry<String, String> o1,
+					Map.Entry<String, String> o2) {
+				return (o1.getValue()).compareTo(o2.getValue());
+			}
+		});
+
+		Map<String, String> sortedMap = new LinkedHashMap<String, String>();
+		for (Iterator<Map.Entry<String, String>> it = list.iterator(); it
+				.hasNext();) {
+			Map.Entry<String, String> entry = it.next();
+			sortedMap.put(entry.getKey(), entry.getValue());
+		}
+		return sortedMap;
+
+	}
+
+	private static String printMap(Map<String, String> map,
+			String tx1FileContent) {
+		StringBuffer sb = new StringBuffer();
+		for (Map.Entry<String, String> entry : map.entrySet()) {
+			sb.append(entry.getKey() + "; ");
+		}
+		sb.append("</p>");
+		Pattern keywordPattern = Pattern
+				.compile("<p (id=\"editor_para_[0-9]+\"|class=\"kwd\") (class=\"kwd\"|role=\"keyword\") (role=\"keyword\"|id=\"editor_para_[0-9]+\")>Keywords: (.*?)</p>");
+		Matcher kwdMat = keywordPattern.matcher(tx1FileContent);
+		while (kwdMat.find()) {
+			// System.out.println(kwdMat.group(4));
+			tx1FileContent = tx1FileContent.replace(kwdMat.group(4),
+					sb.toString());
+		}
+		return (tx1FileContent);
+
+	}
+
+	public String HnmrCnmrHyphenremove(String tx1FileContent) {
+		
+		 
+
+		Pattern HNMRPattern = Pattern.compile("\\s(<span class=\"xps_pre\"><sup>[0-9]+</sup></span>([A-Z])(-)([A-Z]+))\\b");
+		Matcher HNMRMatcher = HNMRPattern.matcher(tx1FileContent);
+		while (HNMRMatcher.find()) {
+tx1FileContent = tx1FileContent.replace(HNMRMatcher.group(0),HNMRMatcher.group(0).replaceAll("-", " "));
+		}
+		  
+		return tx1FileContent;
+	}
+
+	public String FromNdashtoTo(String tx1FileContent) {
+		
+		Pattern refpat = Pattern.compile("(<p id=\"editor_para_(.*?)\"><span class=\"ref_lbl\">(.*?)</p>|(<p id=\"editor_para_[0-9]+\" class=\"del_ref\">(.*?)</p>|<p class=\"del_ref\" id=\"editor_para_[0-9]+\">(.*?)</p>))");
+		Matcher refMat = refpat.matcher(tx1FileContent);
+	    StringBuffer refdata=new StringBuffer();
+		while(refMat.find()){
+			refdata.append(refMat.group(0)); 
+			tx1FileContent=tx1FileContent.replace(refMat.group(0),"");
+		}
+
+		
+		Pattern betpat = Pattern.compile("from\\s([0-9]+|([0-9]+\\.[0-9]+|[0-9]+)(|%))(<span class=\"xps_ndash\">&#8211;</span>|&#8211;|-)(([0-9]+\\.[0-9]+|[0-9]+)|[0-9]+)(|%)\\b"); 		 
+		Matcher betmat = betpat.matcher(tx1FileContent);
+		while(betmat.find())
+		{ 
+			String data=betmat.group(4);
+			System.out.println(betmat.group(1));
+			 tx1FileContent=tx1FileContent.replace(betmat.group(0),betmat.group(0).replace(data, " to "));
+			//System.out.println(betmat.group(0).replace(data, " to "));
+		}
+		
+		Pattern rpat = Pattern.compile("<p (class=\"ref\" id=\"editor_para_[0-9]+\")?(id=\"editor_para_[0-9]+\" class=\"ref\")?>References</p>");
+		Matcher rMat = rpat.matcher(tx1FileContent); 
+		while(rMat.find()){
+			//System.out.println(rMat.group(0));
+			tx1FileContent=tx1FileContent.replaceFirst(rMat.group(0), rMat.group(0)+refdata);
+		}
+		
+		return tx1FileContent;
+	}
+
+	public String jtitletoTitlecase(String tx1FileContent) {
+		Pattern chapbookRefPat = Pattern
+				.compile("<p id=\"editor_para_[0-9]+\"><span class=\"ref_lbl\">(.*?)</p>");
+		Matcher chapbookRefMat = chapbookRefPat.matcher(tx1FileContent);
+		Pattern chaptitPat = Pattern
+				.compile("(<span class=\"ref_jtitle\">|<span class=\"ref_jtitle\">)(.*?)</span>");
+		while (chapbookRefMat.find()) {
+			String strdata = chapbookRefMat.group(0);
+			Matcher chaptitMat = chaptitPat.matcher(strdata);
+			while (chaptitMat.find()) {
+				// System.out.println(chaptitMat.group(1));
+				if (chaptitMat.group(1).contains("class=\"ref_jtitle\"")) {
+					System.out.println(chaptitMat.group(2) + "------");
+					if (chaptitMat.group(2).contains("International")) {
+						System.out.println("International");
+					}
+					String[] data = chaptitMat.group(2).trim()
+							.replaceAll("&#160;", " ").split(" ");
+					StringBuffer sb = new StringBuffer();
+					for (String dat : data) {
+
+						boolean upperCase = dat.equals(dat.toUpperCase());
+						if (!upperCase) {
+							dat = dat.toLowerCase();
+							sb.append(Character.toUpperCase(dat.charAt(0))
+									+ dat.substring(1, dat.length()) + " ");
+						} else {
+							sb.append(dat + " ");
+						}
+					}
+					tx1FileContent = tx1FileContent.replace(
+							chaptitMat.group(0), "<span class=\"ref_jtitle\">"
+									+ sb.toString().trim() + "</span>");
+					// System.out.println("<span class=\"ref_jtitle\">"+sb.toString().trim()+"</span>");
+					// }
+				}
+			}
+		}
+		return tx1FileContent;
+
+	}
+
+	public String mlandmL(String tx1FileContent) {
+		
+
+
+		Pattern chapbookRefPat = Pattern.compile("<span class=\"xps_thinspace\">&#8201;</span>(mL|ml)\\b");
+		Matcher chapbookRefMat = chapbookRefPat.matcher(tx1FileContent); 
+		int ml=0,mL=0;
+		while(chapbookRefMat.find()){
+		//	System.out.println(chapbookRefMat.group(1));
+			String data=chapbookRefMat.group(1);
+			if(data.equals("mL")){
+				mL++;
+			}else if(data.equals("ml")){
+				ml++;
+			}
+		}
+		
+		Pattern supPat1 = Pattern.compile("[0-9]\\s(m(.*?))<sup>&#[0-9]+;[0-9]+</sup>");
+		Matcher supMat1 = supPat1.matcher(tx1FileContent);  
+		while(supMat1.find()){
+			System.out.println(supMat1.group(1));
+			System.out.println(supMat1.group(0));
+			if(mL>ml){
+				tx1FileContent=tx1FileContent.replace(supMat1.group(0), supMat1.group(0).replace(supMat1.group(1),supMat1.group(1).replace("ml","mL<span class=\"xps_thinspace\">&#8201;</span>")));
+			}else if(ml>mL){
+				tx1FileContent=tx1FileContent.replace(supMat1.group(0), supMat1.group(0).replace(supMat1.group(1),supMat1.group(1).replace("mL","ml<span class=\"xps_thinspace\">&#8201;</span>")));
+					}
+			if(ml==mL){
+				tx1FileContent=tx1FileContent.replace(supMat1.group(0), supMat1.group(0).replace(supMat1.group(1),supMat1.group(1).replace("mL","ml<span class=\"xps_thinspace\">&#8201;</span>")));
+					}
+		}
+		
+		
+		Pattern supPat = Pattern.compile("[0-9]<span class=\"xps_thinspace\">&#[0-9]+;</span>((m)(.*?))<sup>&#[0-9]+;[0-9]+</sup>");
+		Matcher supMat = supPat.matcher(tx1FileContent);  
+		while(supMat.find()){
+			System.out.println(supMat.group(1));
+			System.out.println(supMat.group(0));
+			if(mL>ml){
+				tx1FileContent=tx1FileContent.replace(supMat.group(0), supMat.group(0).replace(supMat.group(1),supMat.group(1).replace("ml","mL<span class=\"xps_thinspace\">&#8201;</span>")));
+			}else if(ml>mL){
+				tx1FileContent=tx1FileContent.replace(supMat.group(0), supMat.group(0).replace(supMat.group(1),supMat.group(1).replace("mL","ml<span class=\"xps_thinspace\">&#8201;</span>")));
+					}
+			if(ml==mL){
+				tx1FileContent=tx1FileContent.replace(supMat.group(0), supMat.group(0).replace(supMat.group(1),supMat.group(1).replace("mL","ml<span class=\"xps_thinspace\">&#8201;</span>")));
+					}
+		}
+		
+//		System.out.println("mL count------"+mL+"-------ml Count=="+ml);
+		Pattern RefPat = Pattern.compile("[0-9](<span class=\"xps_thinspace\">&#8201;</span>|\\s)(mL|ml)\\b");
+		Matcher RefMat = RefPat.matcher(tx1FileContent); 
+		while(RefMat.find()){
+			System.out.println(RefMat.group());
+			System.out.println(RefMat.group(1));
+			System.out.println(RefMat.group(2));
+			
+			if(mL>ml){
+				tx1FileContent=tx1FileContent.replace(RefMat.group(0), RefMat.group(0).replace(RefMat.group(2),RefMat.group(2).replace("ml","mL")));
+			}else if(ml>mL){
+				tx1FileContent=tx1FileContent.replace(RefMat.group(0), RefMat.group(0).replace(RefMat.group(2),RefMat.group(2).replace("mL","ml")));
+				}
+			if(ml==mL){
+				tx1FileContent=tx1FileContent.replace(RefMat.group(0), RefMat.group(0).replace(RefMat.group(2),RefMat.group(2).replace("mL","ml")));
+					}
+		}
+		
+		 
+		return tx1FileContent;
+	}
+
+	public String GC_MS_EC_FABtondash(String editorContent) {
+		 Pattern GCMSPattern = Pattern.compile("\\b(GC-MS)\\b");
+		 Matcher GCMSmatcher = GCMSPattern.matcher(editorContent); 
+		 
+		 while(GCMSmatcher.find()){ 
+		  System.out.println(GCMSmatcher.group());
+			 editorContent=editorContent.replace(GCMSmatcher.group(),"G1C_M1STD");
+		 } 
+		 Pattern GCMSPattern1 = Pattern.compile("\\b(G1C_M1STD)\\b");
+		 Matcher GCMSmatcher1 = GCMSPattern1.matcher(editorContent); 
+		 
+		 while(GCMSmatcher1.find()){ 
+			   System.out.println(GCMSmatcher1.group());
+			 editorContent=editorContent.replace(GCMSmatcher1.group(),"GC<span class=\"xps_ndash\">&#8211;</span>MS");
+		 }
+		 
+		 Pattern ESIMSPattern = Pattern.compile("\\b(ESI-MS)\\b");
+		 Matcher ESIMSmatcher = ESIMSPattern.matcher(editorContent); 
+		 
+		 while(ESIMSmatcher.find()){ 
+		  System.out.println(ESIMSmatcher.group());
+			 editorContent=editorContent.replace(ESIMSmatcher.group(),"ES1I-M1STD");
+		 } 
+		 Pattern ESIMSPattern1 = Pattern.compile("\\b(ES1I-M1STD)\\b");
+		 Matcher ESIMSmatcher1 = ESIMSPattern1.matcher(editorContent); 
+		 
+		 while(ESIMSmatcher1.find()){ 
+			   System.out.println(ESIMSmatcher1.group());
+			 editorContent=editorContent.replace(ESIMSmatcher1.group(),"ESI<span class=\"xps_ndash\">&#8211;</span>MS");
+		 }
+		   
+		return editorContent;
+	}
+
+	public String removelitrespace(String tx1FileContent) {
+		Pattern refpat = Pattern.compile("(<p id=\"editor_para_(.*?)\"><span class=\"ref_lbl\">(.*?)</p>|(<p id=\"editor_para_[0-9]+\" class=\"del_ref\">(.*?)</p>|<p class=\"del_ref\" id=\"editor_para_[0-9]+\">(.*?)</p>))");
+		Matcher refMat = refpat.matcher(tx1FileContent);
+	    StringBuffer refdata=new StringBuffer();
+		while(refMat.find()){
+			refdata.append(refMat.group(0)); 
+			tx1FileContent=tx1FileContent.replace(refMat.group(0),"");
+		}
+		
+		
+		Pattern litpat = Pattern.compile("\\b[0-9]+((\\s)(L|l))\\b");
+		Matcher litMat = litpat.matcher(tx1FileContent); 
+		while(litMat.find()){
+			System.out.println(litMat.group(0));
+			System.out.println(litMat.group(2));
+		  	tx1FileContent=tx1FileContent.replace(litMat.group(0), litMat.group(0).replace(litMat.group(2), "<span class=\"xps_thinspace\">&#8201;</span>"));
+		}
+		
+		Pattern rpat = Pattern.compile("<p (class=\"ref\" id=\"editor_para_[0-9]+\")?(id=\"editor_para_[0-9]+\" class=\"ref\")?>References</p>");
+		Matcher rMat = rpat.matcher(tx1FileContent); 
+		while(rMat.find()){
+			//System.out.println(rMat.group(0));
+			tx1FileContent=tx1FileContent.replaceFirst(rMat.group(0), rMat.group(0)+refdata);
+		}
+		
+		return tx1FileContent;
+	}
+
+	public String thinspaceinAMPM(String tx1FileContent) {
+		Pattern litpat = Pattern.compile("[0-9]+:[0-9]+(\\s)(am|pm)");
+		Matcher litMat = litpat.matcher(tx1FileContent); 
+		while(litMat.find()){
+			System.out.println(litMat.group(1));
+			tx1FileContent=tx1FileContent.replace(litMat.group(0), litMat.group(0).replace(litMat.group(1), "<span class=\"xps_thinspace\">&#8201;</span>"));	
+		}
+		
+		return tx1FileContent;
+	}
+ 
+
+	/*public String authnameorderedRef(String tx1FileContent) //BRX016B
+	{
+		
+	
+		Pattern refPat = Pattern.compile("<span class=\"xps_ndreflinking\">(.*?)</span>");  
+		Matcher refMat = refPat.matcher(tx1FileContent);
+		List<String> al = new ArrayList<String>();
+	    Collections.sort( al, new Comparator<String>() 
+	    		{
+	    			Pattern pattern = Pattern.compile( "(\\d+).*" );
+
+	    				@Override
+	        		public int compare( String s1, String s2 ) 
+	    				{
+	    						if ( s1 == null && s2 == null ) 
+	    							{
+	    								return 0;
+	    							} 
+	    							else if ( s1 != null && s2 == null ) 
+	    							{
+	    								return -1;
+	    							}
+	    							else if ( s1 == null && s2 != null )
+	    							{
+	    								return 1;
+	    							} else
+	    							{
+	    								Matcher s1Matcher = pattern.matcher( s1 );
+	    								Matcher s2Matcher = pattern.matcher( s2 );
+	    								if ( !s1Matcher.matches() && !s2Matcher.matches() ) 
+	    								{
+	    									return s1.compareTo( s2 );
+	    								} else if ( s1Matcher.matches() && !s2Matcher.matches() )
+	    								{
+	    									return -1;
+	    								} else if ( !s1Matcher.matches() && s2Matcher.matches() )
+	    								{
+	    									return 1;
+	    								} else
+	    								{
+	    									int i1 = Integer.parseInt( s1Matcher.group( 1 ) );
+	    									int i2 = Integer.parseInt( s2Matcher.group( 1 ) );
+	    									return i1 - i2;
+	    								}
+	    							}
+	    						
+	    				}
+	    		});
+	    System.out.println(tx1FileContent);
+	}*/
+	
+	public String authnameorderedRef(String tx1FileContent) //BRX016B
+	{
+		
+	
+		Pattern refPat = Pattern.compile("<span class=\"xps_ndreflinking\">(.*?)</span>");  
+		Matcher  refMat = refPat.matcher(tx1FileContent);
+		if (refMat.find()) 
+		{
+		    System.out.println(refMat.group(0)); //prints /{item}/
+		    final String REGEX = "(;)";
+		    final String INPUT ="refMat.group(0)";
+		  //  System.out.println(refMat.group(0));
+		    Pattern pat = Pattern.compile(REGEX);
+		    String[] items = pat.split(refMat.group(0));
+		    Matcher reMat = pat.matcher(tx1FileContent);
+		    StringBuffer refdata=new StringBuffer();
+			while(reMat.find())
+			{
+				refdata.append(refMat); 
+				//tx1FileContent=tx1FileContent.replace(refMat.group(0),"");        
+			}
+
+		   // System.out.println(refMat.group(0));
+		    	for(String s : items) 
+		    		{
+		    			System.out.println(s);
+		    		}
+		    		System.out.print(items);
+		    		Arrays.sort(items);
+		    		System.out.print(items);
+		    		String str = String.valueOf(items);
+		    		System.out.print(str);   
+		       for(String a:items)
+		        	{
+	        	
+		        	//System.out.print(a);                                                                                                                                                                                                                                                         
+		        	a = tx1FileContent.replace("",a); 
+		        	tx1FileContent=tx1FileContent.replace(refMat.group(0),a); 
+	        	
+		        	}   
+		        //tx1FileContent=tx1FileContent.replace(refMat.group(0),a);                             
+		    
+					} else
+						{
+						System.out.println("Match not found");
+						}//
+		   					return  tx1FileContent;
+		   					
+	    }
+ 
+  	public String sameyearsepDif(String tx1FileContent) //BRX016B BRX017A
+	{
+		
+	
+		Pattern refPat = Pattern.compile("<span class=\"xps_ndreflinking\">(.*?)</span>"); // "([a-zA-Z]*\\.\\;\\s[0-9]{4}(\\s)[a-z]{1}[,][a-z]{1})"  ([A-Za-z][.][,][;])*
+		
+		Matcher refMat = refPat.matcher(tx1FileContent);
+		while(refMat.find())
+		{
+			//	System.out.println(chapbookRefMat.group(1));
+				String data=refMat.group(1);
+				
+				System.out.println(refMat.group(1));
+				 
+				 String regex = "[0-9]{4}[a-z]{1}[,][a-z]{1}";
+				 Pattern supPat1 = Pattern.compile(regex);
+				 Matcher supMat1 = supPat1.matcher(data); 
+				 while (supMat1.find())
+			        {
+					
+			  	      System.out.println("pattern   " + supMat1.group(0));
+			  	       String dat=supMat1.group(0);
+			  	     String delimiters = ",";
+			  	      // System.out.printf("Name entered: %s\n", matcher.group(0));
+			  	      String[] tokensVal = dat.split(delimiters);
+			  	      String a = tokensVal[0];
+			  	      String b = tokensVal[1];
+			  	   // String c = tokensVal[1];
+			  	//  String d = tokensVal[1];
+			  	      
+			  	   	 // System.out.println(a);
+			  	 String c = a.replace("a","b");
+			  	   //System.out.println(b);
+			  	  System.out.println(a+','+c);
+			  	  
+			  	System.out.println(b);
+			  	System.out.println(a);
+			  	System.out.println(b);
+			  	 // System.out.println(c);
+			//  	System.out.println(d);
+			  	tx1FileContent=tx1FileContent.replace(supMat1.group(0),a+','+c);
+			  			
+			            }
+                    }return tx1FileContent;
+		
+	}
+  	
+  	
+  	public String sameyearDifPat(String tx1FileContent) //BRX016B BRX017A
+	{
+		
+	
+		Pattern refPat = Pattern.compile("<span class=\"xps_ndreflinking\">(.*?)</span>"); // "([a-zA-Z]*\\.\\;\\s[0-9]{4}(\\s)[a-z]{1}[,][a-z]{1})"  ([A-Za-z][.][,][;])*
+		
+		Matcher refMat = refPat.matcher(tx1FileContent);
+		while(refMat.find())
+		{
+			//	System.out.println(chapbookRefMat.group(1));
+				String data=refMat.group(1);
+				
+				System.out.println(refMat.group(1));
+				 
+				 String regex = "(\\s)[0-9]{4}[a-z]{1}[,](\\s)[0-9]{4}[a-z]{1}";
+				 Pattern supPat1 = Pattern.compile(regex);
+				 Matcher supMat1 = supPat1.matcher(data); 
+				 while (supMat1.find())
+			        {
+					
+			  	      System.out.println("pattern   " + supMat1.group(0));
+			  	       String dat=supMat1.group(0);
+			  	     String delimiters = ",";
+			  	      // System.out.printf("Name entered: %s\n", matcher.group(0));
+			  	      String[] tokensVal = dat.split(delimiters);
+			  	      String a = tokensVal[0];
+			  	      String b = tokensVal[1];
+			  	   // String c = tokensVal[1];
+			  	//  String d = tokensVal[1];
+			  	      
+			  	   	 // System.out.println(a);
+			  	// String c = a.replace("a","b;");
+			  	   //System.out.println(b);
+			  	  System.out.println(a+','+'b');
+			  	tx1FileContent=tx1FileContent.replace(supMat1.group(0),a+','+'b');
+			  	 // System.out.println(c);
+			//System.out.println(d);
+				
+			            }
+                    }return tx1FileContent;
+		
+	}
+   }
+				 
+				/*Pattern supPat1 = Pattern.compile("(.*)(\\d+)(.*)</span>");
+				Matcher supMat1 = supPat1.matcher(tx1FileContent);  
+				
+				if(supMat1.find())
+				{
+					System.out.println(supMat1.group(1));
+				}
+		}return tx1FileContent;
+		
+	}
+   }
+						
+		/*Pattern supPat1 = Pattern.compile("\\d{4}[a-z]{1}[,][a-z]{1}</span>");
+		Matcher supMat1 = supPat1.matcher(tx1FileContent);  
+		
+		if(supMat1.find())
+		{
+			System.out.println(supMat1.group(1));
+		
+		Pattern supPat2 = Pattern.compile("^[0-9]{4}[a-z]{1}[,][a-z]{1}");
+		Matcher supMat2 = supPat2.matcher(tx1FileContent);  
+		if(supMat1.find())
+		{
+	
+			//System.out.println(supMat2.group(1));
+			
+	  //  String regex = "[0-9]{4}(\\s)[a-z]{1}[,][0-9]{4}(\\s)[a-z]{1})";
+	    //"((?:[a-zA-Z]\\.\\;\\s*)*[0-9]{4}(\\s)[a-z]{1}[,][a-z]{1})";
+		} 
+		}
+		}/* String delimiters = "\\s+|,\\s*|\\.\\s*";
+	    Pattern pattern = Pattern.compile((\\w++)");
+	    String c1 = "";//1896 a,1896 b
+
+	    Matcher matcher = pattern.matcher(c1);
+
+	    if (matcher.find()) 
+	    {
+	      System.out.println("GROUP 0:" + matcher.group(0));
+	      String[] tokensVal = c1.split(delimiters);
+	      String a = tokensVal[0];
+	      String b = tokensVal[1];
+	      String c = tokensVal[2];
+	      String d = tokensVal[3];
+	      System.out.println(a+b+", "+d);
+	    }
+
+	    else
+	    {
+	    	System.out.println("not found");
+	    	
+	    	 
+	        }*/
+		//}return tx1FileContent;
+//	}
+   
+   		     /* String a = refMat.group(0);
+		      String b = refMat.group(1);
+		      String c = refMat.group(2);*/
+		    /*for(i=0;i<=length;i++)
+		    { 
+		    	
+		    }
+		}//prints /{item}/
+		     //  System.out.println(refMat.group(0));
+	    System.out.println(refMat);
+	    //String refMat = "1896 a,b";*/
+	 /*  Matcher matcher = pattern.matcher(refMat);
+	    if (matcher.find()) {
+		      System.out.println("GROUP 0:" + matcher.group(0));
+		      String[] tokensVal = candidate.split(delimiters);
+		      String a = tokensVal[0];
+		      String b = tokensVal[1];
+		      String c = tokensVal[2];
+		      System.out.println(a+"a"+","+" "+a+"b");
+		    }
+
+		    else{
+		    	System.out.println("not found");
+		    	
+		    	 
+		    }*/
+	    
+	    
+	    
+	    
+	    /*if (refMat.find()) 
+		{
+		    System.out.println(refMat.group(0)); //prints /{item}/
+		    final String REGEX = "([0-9]{4}+)";//^[12][0-9]{3}$
+		    final String INPUT ="refMat.group(0)";
+		    System.out.println(refMat.group(0));
+		}
+		    else {
+		        System.out.println("Match not found");
+		    }
+		//String pattStr = "([a-zA-Z]+,+[0-9]{4}+[a-z]{1}+,+[a-z]{1})";
+	/*	Pattern p = Pattern.compile(REGEX);
+		Matcher m = p.matcher(refMat.group(0));
+		StringBuffer bufStr = new StringBuffer();
+		boolean flag = false;
+				while ((flag = m.find()))
+		  {
+			  String rep = m.group();
+			  m.appendReplacement(bufStr, "found<"+ rep+"a"+","+"found<"+"b"+">");
+						
+		  }
+				  m.appendTail(bufStr);
+				  String result = bufStr.toString();
+				  System.out.println(result);*/
+				//  return tx1FileContent;
+		//}
+
+	    		    
+/*public String testingnamesort(String tx1FileContent) {
+
+	Pattern namePattern = Pattern
+			.compile("<span class=\"xps_ndreflinking\">(.*?)</span>");  
+	Matcher namMat = namePattern.matcher(tx1FileContent);
+	String pattStr = "([a-zA-Z]+,+[0-9]{4}+[a-z]{1}+,+[a-z]{1})";
+	Pattern namePattern1 = Pattern
+			.compile("<span class=\"xps_ndreflinking\">(.*?)</span>");
+	Map m1 = new HashMap();
+	List l1 = new ArrayList();
+			
+	while (namMat.find()) 
+	{
+		Matcher namMat1 = namePattern1.matcher(namMat.group(4));
+		while (namMat1.find())
+		{
+			String data = namMat1.group(1).replace("", "")
+					.replace("</em>", "");
+			m1.put(namMat1.group(0), data);
+			l1.add(namMat1.group(0));
+			System.out.println(namMat1.group(0));
+		}
+
+	}
+
+	Map sortedMap = sortByComparator(m1);
+	return printMap(sortedMap, tx1FileContent);
+
+}
+
+
+} 
+
+/*"<p  (class=\"txt\"|class=\"xps_ndreflinking\") (class=\"xps_ndreflinking\"|id=\"editor_para_[20-29]+\")>lead to severe economical losses worldwide (.*?)</p>");
+ * (id=\"editor_para_[20-29]+\"|class=\"txt\")
+ */
+
+ 
+
+
+
+
+	
+ 
+	
+
+
+		               
+	        		
+
+		
