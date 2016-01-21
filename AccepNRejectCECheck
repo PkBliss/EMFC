@@ -1,0 +1,501 @@
+package com.elsevier;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class AcceptNRejectCeCheck {
+
+	public String tableFirstLetterCapital(String tx1FileContent) {
+
+		 Pattern tablePattern = Pattern.compile("<thead>(?:(?>[^<]+)|<(?!thead\b[^>]*>))*?</thead>");
+		 Matcher tablematcher = tablePattern.matcher(tx1FileContent);  
+		 Pattern cellPattern = Pattern.compile("<p (id=\"editor_para_[0-9]+\" class=\"txt\"|class=\"txt\" id=\"editor_para_[0-9]+\")>(.*?)</p>");
+		 while(tablematcher.find()){ 
+			String pdata=tablematcher.group(0);
+			//System.out.println(tablematcher.group(0));
+			Matcher cellmatcher = cellPattern.matcher(pdata);
+			 
+			 while(cellmatcher.find()){
+				 System.out.println(cellmatcher.group(0));
+				 String paradata=cellmatcher.group(0);
+				 String celldata=cellmatcher.group(2).toLowerCase();
+				 String Udata=celldata.replaceFirst(celldata.substring(0,1),celldata.substring(0,1).toUpperCase());
+				 System.out.println(Udata);
+				  tx1FileContent=tx1FileContent.replace(paradata, paradata.replace(cellmatcher.group(2), Udata)) ;
+			 }
+			 
+		 }
+  System.out.println(tx1FileContent);
+return tx1FileContent;
+}
+
+	
+	/**
+	 * Method is used to change hypen into Enrules
+	 * @param tx1FileContent
+	 * @return
+	 */
+	public String replace_Hyphen_To_EnRules(String tx1FileContent) {
+
+		Pattern lambdaPattern = Pattern.compile("(\\bTris-HCl\\b)");
+		Matcher lambdaMatcher = lambdaPattern.matcher(tx1FileContent);
+		int mmi = 170;
+		while (lambdaMatcher.find()) {
+			tx1FileContent = tx1FileContent
+					.replace(
+							lambdaMatcher.group(0),
+							"<span class=\"del cts-1\" data-cid="
+									+ "\""
+									+ ++mmi
+									+ "\""
+									+ " title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">Tris-Hcl1p1p</span><span class=\"ins cts-1\" data-cid="
+									+ "\""
+									+ ++mmi
+									+ "\""
+									+ " title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"
+									+ lambdaMatcher
+											.group(0)
+											.replace("-",
+													"<span class=\"xps_ndash\">&#8211;</span>")
+									+ "</span>");
+
+		}
+		tx1FileContent = tx1FileContent.replace("Tris-Hcl1p1p", "Tris-HCl");
+		
+		return tx1FileContent;
+
+	}
+	
+	
+	/**
+	 * Method is used to highlight lambda with accept reject case
+	 * @param tx1FileContent
+	 * @return
+	 */
+	public String changeLambda(String tx1FileContent) {
+
+		Pattern lambdaPattern = Pattern
+				.compile("(((&#955;)(max))|(<strong>(&#955;)</strong>(max))|(<em>(&#955;)</em>(max)))\\b\\s");
+		Matcher lambdaMatcher = lambdaPattern.matcher(tx1FileContent);
+		int mmi = 210;
+		while (lambdaMatcher.find()) {
+			
+			tx1FileContent = tx1FileContent
+					.replace(
+							lambdaMatcher.group(0),
+							"<span class=\"del cts-1\" data-cid="
+									+ "\""
+									+ ++mmi
+									+ "\""
+									+ " title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"
+									+ lambdaMatcher.group(1)
+									+ "</span><span class=\"ins cts-1\" data-cid="
+									+ "\""
+									+ ++mmi
+									+ "\""
+									+ " title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"
+									+ lambdaMatcher.group(0).replace(
+											lambdaMatcher.group(1),
+											lambdaMatcher.group(3) + "<sub>"
+													+ lambdaMatcher.group(4)
+													+ "</sub>") + "</span>");
+		}
+		
+		return tx1FileContent;
+
+	}
+
+	
+	
+
+	public String decimal_point_checking(String tx1FileContent) {
+
+		Pattern refpat = Pattern.compile("(<p id=\"editor_para_(.*?)\"><span class=\"ref_lbl\">(.*?)</p>|(<p id=\"editor_para_[0-9]+\" class=\"del_ref\">(.*?)</p>|<p class=\"del_ref\" id=\"editor_para_[0-9]+\">(.*?)</p>))");
+		Matcher refMat = refpat.matcher(tx1FileContent);
+	    StringBuffer refdata=new StringBuffer();
+		while(refMat.find()){
+			refdata.append(refMat.group(0)); 
+			tx1FileContent=tx1FileContent.replace(refMat.group(0),"");
+		}
+
+
+		
+		
+		
+		Pattern zeroPattern = Pattern.compile("\\s(0\\.[0-9]+)");
+		Matcher zeroMatcher = zeroPattern.matcher(tx1FileContent);
+		
+		Pattern nozeroPattern = Pattern.compile("(\\s(\\.[0-9]+))");
+		
+		Pattern nozeroPattern1 = Pattern.compile("(\\s(\\.[0-9]+))");
+		
+		
+		Matcher nozeroMatcher = nozeroPattern.matcher(tx1FileContent);
+		
+		Matcher nozeroMatcher1 = nozeroPattern1.matcher(tx1FileContent);
+		
+		Pattern zeroPattern1 = Pattern.compile("\\s(0\\.[0-9]+)");
+		Matcher zeroMatcher1 = zeroPattern1.matcher(tx1FileContent);
+		int mmi=50,i=0,k=0;
+		while (zeroMatcher.find())  
+		{ 
+			// System.out.println(zeroMatcher.group(0)); //0.74 like
+			i++; 
+		}  
+		while (nozeroMatcher.find())  
+		{ 
+			  //.23 like
+			 String datapoint=nozeroMatcher.group(0);
+			 if(nozeroMatcher.group(0).contains("(")){
+				 datapoint=datapoint.replace("(","");
+				 k++; 
+			 }else{
+			k++; 
+		} 
+			 
+		
+		}
+		 
+		 
+		  
+	  if(i>k){
+			 while (nozeroMatcher1.find())  
+				{ 
+			//	  System.out.println(nozeroMatcher1.group(2)); 
+	tx1FileContent=tx1FileContent.replace(nozeroMatcher1.group(0),"<span class=\"del cts-1\" data-cid="+"\""+ ++mmi+"\""+" title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"+nozeroMatcher1.group(0)+"</span><span class=\"ins cts-1\" data-cid="+"\""+ ++mmi+"\""+" title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"+nozeroMatcher1.group(2).replace(nozeroMatcher1.group(2),"0"+nozeroMatcher1.group(2))+"</span>");
+					 
+				} 
+	  }else if(k>i){
+		//  System.out.println(k);
+			 while (zeroMatcher1.find())  
+				{ 
+			// 	 System.out.println(zeroMatcher1.group(1).substring(zeroMatcher1.group(1).indexOf('.')));
+	  tx1FileContent=tx1FileContent.replace(zeroMatcher1.group(0),"<span class=\"del cts-1\" data-cid="+"\""+ ++mmi+"\""+" title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"+zeroMatcher1.group(1)+"</span><span class=\"ins cts-1\" data-cid="+"\""+ ++mmi+"\""+" title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"+zeroMatcher1.group(0).replace(zeroMatcher1.group(1),zeroMatcher1.group(1).substring(zeroMatcher1.group(1).trim().indexOf('.')))+"</span>");
+
+				} 
+		 }
+		  
+	  
+	  Pattern rpat = Pattern.compile("<p (class=\"ref\" id=\"editor_para_[0-9]+\")?(id=\"editor_para_[0-9]+\" class=\"ref\")?>References</p>");
+		Matcher rMat = rpat.matcher(tx1FileContent); 
+		while(rMat.find()){
+			//System.out.println(rMat.group(0));
+			tx1FileContent=tx1FileContent.replaceFirst(rMat.group(0), rMat.group(0)+refdata);
+		}
+		
+	  
+	  
+	//System.out.println(tx1FileContent);
+	return tx1FileContent;
+}
+
+	public String replace_nOe(String tx1FileContent) {
+
+	Pattern lambdaPattern = Pattern.compile("\\s\\(nOe\\)");
+	Matcher lambdaMatcher = lambdaPattern.matcher(tx1FileContent);
+	int mmi = 190;
+	while (lambdaMatcher.find()) {
+		tx1FileContent = tx1FileContent
+				.replace(
+						lambdaMatcher.group(0),
+						"<span class=\"del cts-1\" data-cid="
+								+ "\""
+								+ ++mmi
+								+ "\""
+								+ " title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">nOe1p1p</span><span class=\"ins cts-1\" data-cid="
+								+ "\""
+								+ ++mmi
+								+ "\""
+								+ " title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"
+								+ lambdaMatcher.group(0).replace(
+										lambdaMatcher.group(0), "(NOE)")
+								+ "</span>");
+
+	} 
+	tx1FileContent = tx1FileContent.replace("nOe1p1p", " (nOe)");
+	// System.out.println(tx1FileContent);
+	return tx1FileContent;
+
+}
+	
+	
+	/**
+	 * Method is used to remove thousand separator
+	 * @param tx1FileContent
+	 * @return
+	 */
+	public String thousandSeperator_Remover(String tx1FileContent) {
+		 
+
+		
+		Pattern commaPattern = Pattern.compile("\\b([0-9]{1,2},[0-9]{3})\\b");
+		Matcher commaMatcher = commaPattern.matcher(tx1FileContent);
+		int mmi=50;
+		while (commaMatcher.find())  
+		{ 
+			
+	   //    tx1FileContent=tx1FileContent.replace(commaMatcher.group(0),"<span class=\"del cts-1\" data-cid="+"\""+ ++mmi+"\""+" title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"+commaMatcher.group(1)+"</span><span class=\"ins cts-1\" data-cid="+"\""+ ++mmi+"\""+" title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"+commaMatcher.group(0).replace(",","")+"</span>");
+			 tx1FileContent=tx1FileContent.replace(commaMatcher.group(0),commaMatcher.group(0).replace(",",""));
+			
+		} 
+		 
+		return tx1FileContent;
+		
+		
+		
+		
+	}
+	
+	
+	
+	/**
+	 * Method is used to highlight arc second or mint with accept reject case
+	 * @param tx1FileContent
+	 * @return
+	 */
+	public String ArcSecORMinToSymbolconverter(String tx1FileContent) {
+		Pattern refpat = Pattern.compile("(<p id=\"editor_para_(.*?)\"><span class=\"ref_lbl\">(.*?)</p>|(<p id=\"editor_para_[0-9]+\" class=\"del_ref\">(.*?)</p>|<p class=\"del_ref\" id=\"editor_para_[0-9]+\">(.*?)</p>))");
+		Matcher refMat = refpat.matcher(tx1FileContent);
+	    StringBuffer refdata=new StringBuffer();
+		while(refMat.find()){
+			refdata.append(refMat.group(0)); 
+			tx1FileContent=tx1FileContent.replace(refMat.group(0),"");
+		}
+
+
+		Pattern arcPattern = Pattern.compile("\\s([0-9]+(\\sarcseconds)|[0-9]+(<span class=\"xps_thinspace\">&#8201;</span>arcminutes)|(arcminutes)|(arcseconds))");
+		Matcher arcMatcher = arcPattern.matcher(tx1FileContent);
+		int mmi=30;
+		while ( arcMatcher.find() ) {
+			
+	//System.out.println(arcMatcher.group(1));
+			if(arcMatcher.group(1).contains("arcsecond")){
+				System.out.println(arcMatcher.group(0));
+	tx1FileContent=tx1FileContent.replaceAll(arcMatcher.group(0),"<span class=\"del cts-1\" data-cid="+ ++mmi +" title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"+arcMatcher.group(1)+"</span> <span class=\"ins cts-1\" data-cid="+ ++mmi +" title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"+arcMatcher.group(0).replace(" ","").replace("arcseconds","&#8243;")+"</span>");
+			}else{
+				if(arcMatcher.group(1).contains("<span class=\"xps_thinspace\">&#8201;</span>")){
+					tx1FileContent=tx1FileContent.replaceAll(arcMatcher.group(0),"<span class=\"del cts-1\" data-cid="+ ++mmi +" title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"+arcMatcher.group(1)+"</span> <span class=\"ins cts-1\" data-cid="+ ++mmi +" title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"+arcMatcher.group(0).replace("arcminutes","&#8242;").replace("<span class=\"xps_thinspace\">&#8201;</span>", "")+"</span>");
+								}else{
+									tx1FileContent=tx1FileContent.replaceAll(arcMatcher.group(0),"<span class=\"del cts-1\" data-cid="+ ++mmi +" title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"+arcMatcher.group(1)+"</span> <span class=\"ins cts-1\" data-cid="+ ++mmi +" title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"+arcMatcher.group(0).replace(" ","").replace("arcminutes","&#8242;")+"</span>");
+											
+								}}}
+
+		Pattern rpat = Pattern.compile("<p (class=\"ref\" id=\"editor_para_[0-9]+\")?(id=\"editor_para_[0-9]+\" class=\"ref\")?>References</p>");
+		Matcher rMat = rpat.matcher(tx1FileContent); 
+		while(rMat.find()){
+			//System.out.println(rMat.group(0));
+			tx1FileContent=tx1FileContent.replaceFirst(rMat.group(0), rMat.group(0)+refdata);
+		}
+		
+		return tx1FileContent;
+	}
+
+
+	
+	public String dSmallCaps(String tx1FileContent) {
+
+		Pattern smallPattern = Pattern.compile("\\s(\\b([D|L|d|l]{1})(-|<span class=\"CeCheck\">-</span>)([A-Za-z]+))");
+		  Matcher smallMatcher = smallPattern.matcher(tx1FileContent);
+		  int mmi=40;
+		  while (smallMatcher.find()) { 
+		     String smallData=smallMatcher.group(2); 
+		     System.out.println(smallData);
+		 String output =smallData.substring(0,1); 
+		 if(smallMatcher.group(2).equalsIgnoreCase("D")||smallMatcher.group(2).equalsIgnoreCase("L")){
+ tx1FileContent=tx1FileContent.replace(smallMatcher.group(0),smallMatcher.group(0).replace(smallMatcher.group(2),"<span class=\"xps_smallCaps\">"+smallMatcher.group(2).toUpperCase()+"</span>"));
+		 }
+		  }
+		   
+		 //System.out.println(tx1FileContent);
+	//System.out.println(tx1FileContent);
+	return tx1FileContent;
+}
+
+	
+	public String removeNdashBetweenDigit(String tx1FileContent) {
+
+	Pattern betweenPattern = Pattern
+			.compile("\\s(between(\\s[0-9]+<span class=\"xps_ndash\">&#8211;</span>[0-9]+\\b)|between\\s([0-9]+-[0-9]+))");
+	Matcher betweenMatcher = betweenPattern.matcher(tx1FileContent);
+	int mmi = 251;
+	while (betweenMatcher.find()) {
+		// System.out.println(degMatcher.group(1));
+		if (betweenMatcher.group(1).contains(
+				"<span class=\"xps_ndash\">&#8211;</span>")) {
+			tx1FileContent = tx1FileContent
+					.replaceAll(
+							betweenMatcher.group(0),
+							"<span class=\"del cts-1\" data-cid="
+									+ ++mmi
+									+ " title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"
+									+ betweenMatcher.group(1)
+									+ "</span><span class=\"ins cts-1\" data-cid="
+									+ ++mmi
+									+ " title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"
+									+ betweenMatcher
+											.group(0)
+											.replace(
+													"<span class=\"xps_ndash\">&#8211;</span>",
+													" and ") + "</span>");
+		} else if (betweenMatcher.group(1).contains("-")) {
+			tx1FileContent = tx1FileContent
+					.replaceAll(
+							betweenMatcher.group(0),
+							"<span class=\"del cts-1\" data-cid="
+									+ ++mmi
+									+ " title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"
+									+ betweenMatcher.group(1)
+									+ "</span><span class=\"ins cts-1\" data-cid="
+									+ ++mmi
+									+ " title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"
+									+ betweenMatcher.group(0).replace("-",
+											" and ") + "</span> ");
+		}
+	}
+	//System.out.println(tx1FileContent);
+	return tx1FileContent;
+}
+
+	public String removeNdashFromDigit(String tx1FileContent) {
+
+	// Pattern degPattern =
+	// Pattern.compile("\\s(from\\s[0-9]+<span class=\"xps_ndash\">&#8211;</span>[0-9]+\\b)");
+	Pattern fromPattern = Pattern
+			.compile("\\s(from(\\s[0-9]+<span class=\"xps_ndash\">&#8211;</span>[0-9]+\\b)|from\\s([0-9]+-[0-9]+))");
+	Matcher fromMatcher = fromPattern.matcher(tx1FileContent);
+	int mmi = 261;
+	while (fromMatcher.find()) {
+		// System.out.println(degMatcher.group(1));
+		if (fromMatcher.group(1).contains(
+				"<span class=\"xps_ndash\">&#8211;</span>")) {
+			tx1FileContent = tx1FileContent
+					.replaceAll(
+							fromMatcher.group(0),
+							"<span class=\"del cts-1\" data-cid="
+									+ ++mmi
+									+ " title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"
+									+ fromMatcher.group(1)
+									+ "</span><span class=\"ins cts-1\" data-cid="
+									+ ++mmi
+									+ " title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"
+									+ fromMatcher
+											.group(0)
+											.replace(
+													"<span class=\"xps_ndash\">&#8211;</span>",
+													" to ") + "</span>");
+		} else if (fromMatcher.group(1).contains("-")) {
+			tx1FileContent = tx1FileContent
+					.replaceAll(
+							fromMatcher.group(0),
+							"<span class=\"del cts-1\" data-cid="
+									+ ++mmi
+									+ " title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"
+									+ fromMatcher.group(1)
+									+ "</span><span class=\"ins cts-1\" data-cid="
+									+ ++mmi
+									+ " title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"
+									+ fromMatcher.group(0).replace("-"," to ") + "</span>");
+		}
+	}
+	return tx1FileContent;
+	//System.out.println(tx1FileContent);
+}
+
+	public String DegRemovefrmKelvin(String tx1FileContent) {
+
+		Pattern refpat = Pattern.compile("(<p id=\"editor_para_(.*?)\"><span class=\"ref_lbl\">(.*?)</p>|(<p id=\"editor_para_[0-9]+\" class=\"del_ref\">(.*?)</p>|<p class=\"del_ref\" id=\"editor_para_[0-9]+\">(.*?)</p>))");
+		Matcher refMat = refpat.matcher(tx1FileContent);
+	    StringBuffer refdata=new StringBuffer();
+		while(refMat.find()){
+			refdata.append(refMat.group(0)); 
+			tx1FileContent=tx1FileContent.replace(refMat.group(0),"");
+		}
+
+		
+		
+		Pattern degPattern = Pattern.compile("<span class=\"xps_thinspace\">&#8201;</span>&#176;(K|k)");
+		Matcher degMatcher = degPattern.matcher(tx1FileContent);
+		int mmi=1000;
+		while ( degMatcher.find() ) {
+			
+			//System.out.println(degMatcher.group(0));
+			tx1FileContent=tx1FileContent.replace(degMatcher.group(0), "<span class=\"del cts-1\" data-cid="+ ++mmi +" title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\"><span class=\"xps_thinspace\">&#8201;</span>&#176;K</span></span><span class=\"ins cts-1\" data-cid="+ ++mmi +" title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"+degMatcher.group(0).replace("&#176;K","K")+"</span>");	
+			 break;
+		} 
+			Pattern oPattern = Pattern.compile("(<sup>o</sup>)[A-Z]\\s");  //
+			Matcher oMatcher = oPattern.matcher(tx1FileContent);
+			int mmii=14;
+			while ( oMatcher.find() ) {
+				System.out.println(oMatcher.group(1));
+				//System.out.println(degMatcher.group(0));
+			 	tx1FileContent=tx1FileContent.replace(oMatcher.group(0), "<span class=\"del cts-1\" data-cid="+ ++mmii +" title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"+oMatcher.group(0)+"</span><span class=\"ins cts-1\" data-cid="+ ++mmii +" title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"+oMatcher.group(0).replace(oMatcher.group(1),"&#176;")+"</span>");	
+				// break;
+			}  
+						
+			Pattern oPattern1 = Pattern.compile("[0-9]+((|\\s)&#176;(K|k))");  //
+			Matcher oMatcher1 = oPattern1.matcher(tx1FileContent);
+			int mmiii=14;
+			while ( oMatcher1.find() ) {
+				System.out.println(oMatcher1.group(2));
+			//	System.out.println(oMatcher1.group(0));
+			 
+				tx1FileContent=tx1FileContent.replace(oMatcher1.group(0), "<span class=\"del cts-1\" data-cid="+ ++mmiii +" title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"+oMatcher1.group(0)+"</span><span class=\"ins cts-1\" data-cid="+ ++mmiii +" title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"+oMatcher1.group(0).replace(oMatcher1.group(1),"<span class=\"xps_thinspace\">&#8201;</span>K")+"</span>");	
+				// break;
+			} 
+			
+			
+			Pattern rpat = Pattern.compile("<p (class=\"ref\" id=\"editor_para_[0-9]+\")?(id=\"editor_para_[0-9]+\" class=\"ref\")?>References</p>");
+			Matcher rMat = rpat.matcher(tx1FileContent); 
+			while(rMat.find()){
+				//System.out.println(rMat.group(0));
+				tx1FileContent=tx1FileContent.replaceFirst(rMat.group(0), rMat.group(0)+refdata);
+			}
+			
+			
+	return tx1FileContent;
+}
+
+	public String samewordhyphentoendash(String editorContent) {
+		 Pattern hyPattern = Pattern.compile("\\b(([a-zA-Z]+)-([a-zA-Z]+))\\s"); 
+		 Matcher hycmatcher = hyPattern.matcher(editorContent); 
+		 int mmi=299;
+		 while(hycmatcher.find()){ 
+			 String d1=hycmatcher.group(2);
+			 String d2=hycmatcher.group(3);
+		//	 System.out.println(d1+"---"+d2);
+			 if(hycmatcher.group(2).equals(hycmatcher.group(3).trim())){
+				//  System.out.println("========"+hycmatcher.group(2)+"--"+hycmatcher.group(3)+"==========");
+	   editorContent=editorContent.replace(hycmatcher.group(0),"<span class=\"del cts-1\" data-cid="+ ++mmi +" title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"+hycmatcher.group(1)+"</span><span class=\"ins cts-1\" data-cid="+ ++mmi +" title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"+hycmatcher.group(2)+"<span class=\"xps_ndash\">&#8211;</span>"+hycmatcher.group(3)+"</span> ");	
+					
+			 }  
+		 }
+		 //System.out.println(editorContent);
+		return editorContent;
+	}
+
+
+	public String H_NMRHypenRemover(String tx1FileContent) {
+		Pattern HNMRPattern = Pattern
+				.compile("\\s(<span class=\"xps_pre\"><sup>[0-9]+</sup></span>([A-Z])(-)([A-Z]+))\\b");
+		Matcher HNMRMatcher = HNMRPattern.matcher(tx1FileContent);
+		  int HNMR =10;
+while (HNMRMatcher.find()) {
+	 
+	     String matchdata=HNMRMatcher.group(2);
+String fulldata=HNMRMatcher.group(0);
+	    System.out.println(HNMRMatcher.group(0));
+	    
+	     fulldata = fulldata.replace(HNMRMatcher.group(0),"<span class=\"del cts-1\" data-cid="+"\""+ (++HNMR) +"\""+" title=\"Deleted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239171006\">"+HNMRMatcher.group(1)+"</span><span class=\"ins cts-1\" data-cid="+"\""+ (++HNMR) +"\""+" title=\"Inserted\" data-userid=\"11\" data-username=\"1p1p\" data-time=\"1417239176275\">"+HNMRMatcher.group(1).replace("-", " ")+"</span>");
+    
+	     tx1FileContent=tx1FileContent.replace(HNMRMatcher.group(0),fulldata);
+}
+
+ //	System.out.println(tx1FileContent); 
+ 
+		return tx1FileContent;
+	}
+
+	
+
+
+}
