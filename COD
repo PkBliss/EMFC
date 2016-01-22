@@ -1,0 +1,954 @@
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.RandomAccessFile;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
+import org.apache.poi.hssf.usermodel.HSSFCell;
+import org.apache.poi.hssf.usermodel.HSSFRow;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+public class TesRep {
+	public static void main (String[] args) throws IOException 
+	   // public void serveResource(ResourceRequest request, ResourceResponse response)throws IOException 
+		  {
+		
+			//String path="H://OrderInfo.txt";
+		try {
+			Class.forName("com.mysql.jdbc.Driver").newInstance();
+			java.sql.Connection conn=null;
+			Statement stmt=null;
+			conn = DriverManager.getConnection("jdbc:mysql://10.10.10.14:3306/OPSBANK-II","root","p@ssw0rd");
+			System.out.println("Connection established.....");
+			stmt =conn.createStatement();
+			System.out.println("Connected....");
+			
+			HSSFWorkbook hwb = new HSSFWorkbook();
+		
+		
+			String path="D:\\Logged.txt";
+			int orderid;
+			String status = "";
+			File logFile=new File(path);
+			
+			
+			String path1="H://FF_123.txt";
+			StringBuilder sb = new StringBuilder();
+			StringBuilder sb1 = new StringBuilder();
+		
+		
+		
+		    FileInputStream inputFile=new FileInputStream(path1);
+		   // BufferedReader br = new BufferedReader(new FileReader(path1));
+			List data = new ArrayList();
+			//String path2="H://FF_123.txt";
+			
+			
+			 FileInputStream inputFile1=new FileInputStream(path1);
+			 FileOutputStream fos=new FileOutputStream(logFile);
+			 BufferedReader br = new BufferedReader(new FileReader(path1));
+			 BufferedReader br1 = new BufferedReader(new FileReader(path));
+			 BufferedWriter bw1 = new BufferedWriter(new OutputStreamWriter(fos));
+			 //BufferedReader bur = new BufferedReader(new FileReader(path));
+			 
+			 //ResultSet rs;
+			// List data = new ArrayList();
+			    try {
+			       
+			        String line = br.readLine();
+
+			        while (line != null) {
+			            sb.append(line);
+			            line = br.readLine();
+			            
+				           System.out.println( sb.toString());
+			        }
+			    }
+			    finally {
+			        br.close();
+			    }
+			    
+			   
+			    String content = new String(Files.readAllBytes(Paths.get(path1)));
+				System.out.println(content);
+				System.out.println("Connection Initiated");
+				FileOutputStream fop = null;
+				ResultSet rs;
+				ResultSet rs1;
+				/*MyMethods MyMet= new MyMethods();
+				MyMet.orderinf();*/
+				
+				try{
+					
+					ResultSet rs3 = stmt.executeQuery("Select orderid,status from orderinfo limit 50");
+					
+					int rowCount = 0;
+					String s3="";
+					String s2="'";
+					String s1="";
+					String s4="";
+					while(rs3.next()) {
+			            rowCount = Integer.parseInt(rs3.getString("ORDERID"));
+			            System.out.println(Integer.parseInt(rs3.getString("ORDERID")));
+			            s1 = Integer.parseInt(rs3.getString("ORDERID"))+"',";
+			            s3 =s2+s1;
+			            s4=s4+s3;
+					}
+					System.out.println(s4);
+					s4=s4.substring(0,s4.lastIndexOf(","));
+		            bw1.write(s4);
+		            
+					 bw1.close();
+			        System.out.println("Count : " + rowCount);
+
+					
+					System.out.println("CAR Over Due Report...ORDER_INFO Details");
+				}
+				catch (Exception ex) 
+				{
+					System.out.println("Database Connection .......: "+ex);
+				}
+
+				
+				
+				
+				
+				 try {
+				       
+				        String line = br1.readLine();
+
+				        while (line != null) {
+				            sb1.append(line);
+				            line = br1.readLine();
+				            
+					           System.out.println( sb1.toString());
+				        }
+				    }
+				    finally {
+				        br1.close();
+				    }
+				
+					//ResultSet rs;
+					try{
+						
+					
+						//String strQuery = "select distinct(orderid), batch, flow, pflow, ordertype, car, qc, vald, upload, u_date, status  from tracking where orderid in ("+sb.toString()+")";
+						rs = stmt.executeQuery("select orderid,batch, flow, pflow, ordertype, car, qc, vald, upload, u_date,item,spuid, status  from tracking where orderid in ("+sb.toString()+") GROUP BY ORDERID ORDER BY status ASC");
+						//HSSFWorkbook hwb = new HSSFWorkbook();
+						System.out.println("CAR Over Due Report...TRACKING DETAILS");
+						//HSSFWorkbook my_xls_workbook = new HSSFWorkbook();
+						HSSFSheet sheet = hwb.createSheet("NORMAL Tracking Report");
+						HSSFSheet my_worksheet = hwb.getSheetAt(0); 
+
+						//HSSFSheet sheet = hwb.createSheet("Tracking Report");
+						HSSFRow rowhead = sheet.createRow((short) 2);
+						rowhead.createCell((short) 0).setCellValue("SNO");
+						rowhead.createCell((short) 1).setCellValue("ORDER ID");
+						rowhead.createCell((short) 2).setCellValue("BATCH");
+						rowhead.createCell((short) 3).setCellValue("FLOW");
+						rowhead.createCell((short) 4).setCellValue("PFLOW");
+						rowhead.createCell((short) 5).setCellValue("ORDER TYPE");
+						rowhead.createCell((short) 6).setCellValue("CAR");
+						rowhead.createCell((short) 7).setCellValue("QC");
+						rowhead.createCell((short) 8).setCellValue("VALID");
+						rowhead.createCell((short) 9).setCellValue("UPLOAD");
+						rowhead.createCell((short) 10).setCellValue("UDATE");
+						rowhead.createCell((short) 11).setCellValue("ITEM");
+						rowhead.createCell((short) 12).setCellValue("SPUID");
+						rowhead.createCell((short) 13).setCellValue("STATUS");
+						
+						
+						
+						
+						int index = 3;
+						int sno = 0;
+						String name = "";
+						while (rs.next())
+						{
+							sno++;
+							HSSFRow row = sheet.createRow((short) index);
+							row.createCell((short) 0).setCellValue(sno);
+							row.createCell((short) 1).setCellValue(rs.getString(1));
+							row.createCell((short) 2).setCellValue(rs.getString(2));
+							row.createCell((short) 3).setCellValue(rs.getString(3));
+							row.createCell((short) 4).setCellValue(rs.getString(4));
+							row.createCell((short) 5).setCellValue(rs.getString(5));
+							row.createCell((short) 6).setCellValue(rs.getString(6));
+							row.createCell((short) 7).setCellValue(rs.getString(7));
+							row.createCell((short) 8).setCellValue(rs.getString(8));
+							row.createCell((short) 9).setCellValue(rs.getString(9));
+							row.createCell((short) 10).setCellValue(rs.getString(10));
+							row.createCell((short) 11).setCellValue(rs.getString(11));
+							row.createCell((short) 12).setCellValue(rs.getString(12));
+							row.createCell((short) 13).setCellValue(rs.getString(13));
+							/*row.createCell((short) 0).setCellValue(sno);
+							row.createCell((short) 1).setCellValue(rs.getString(2));
+							row.createCell((short) 2).setCellValue(rs.getString(5));
+							row.createCell((short) 3).setCellValue(rs.getString(4));
+							row.createCell((short) 4).setCellValue(rs.getString(5));
+							row.createCell((short) 5).setCellValue(rs.getString(18));
+							row.createCell((short) 6).setCellValue(rs.getString(37));
+							row.createCell((short) 7).setCellValue(rs.getString(27));
+							row.createCell((short) 8).setCellValue(rs.getString(40));
+							row.createCell((short) 9).setCellValue(rs.getString(17));
+							row.createCell((short) 10).setCellValue(rs.getString(4));
+							row.createCell((short) 11).setCellValue(rs.getString(4));*/
+							index++;
+						}
+					}
+					catch (Exception ex) 
+					{
+						System.out.println("error1111.......: "+ex);
+					}
+	
+			//ResultSet rs; SHEET2
+								try{
+									
+								
+									//String strQuery1 = "select * from resupply where status='received' and orderid in ("+sb.toString()+")";
+									//ResultSet rs1 = stmt1.executeQuery(strQuery1);
+									rs1 = stmt.executeQuery("select orderid,batch,duedate,uploaddate,ordertype,original_type,car_duedate,car_unitid,original_orderid,uploaddate,source_type,status,remarks from resupply where status='received' and orderid in ("+sb.toString()+") GROUP BY ORDERID ORDER BY status ASC");
+									
+									//HSSFWorkbook hwb = new HSSFWorkbook();
+									System.out.println("CAR Over Due Report...Resupply Details");
+									//HSSFWorkbook my_xls_workbook = new HSSFWorkbook();
+									HSSFSheet sheet2 = hwb.createSheet("Resupply Received status");
+									HSSFSheet my_worksheet1 = hwb.getSheetAt(1); 
+									HSSFRow rowhead1 = sheet2.createRow((short) 2);
+									rowhead1.createCell((short) 0).setCellValue("SNO");
+									rowhead1.createCell((short) 1).setCellValue("ORDER ID");
+									rowhead1.createCell((short) 2).setCellValue("BATCH");
+									rowhead1.createCell((short) 3).setCellValue("DUE DATE");
+									rowhead1.createCell((short) 4).setCellValue("UPLOAD DATE");
+									rowhead1.createCell((short) 5).setCellValue("ORDER TYPE");
+									rowhead1.createCell((short) 6).setCellValue("ORIGINAL TYPE");
+									rowhead1.createCell((short) 7).setCellValue("CARDUE DATE");
+									rowhead1.createCell((short) 8).setCellValue("CARUNIT ID");
+									rowhead1.createCell((short) 9).setCellValue("ORIGINAL ORDER ID");
+									rowhead1.createCell((short) 10).setCellValue("UDATE");
+									rowhead1.createCell((short) 11).setCellValue("SOURCE_TYPE");
+									rowhead1.createCell((short) 12).setCellValue("STATUS");
+									rowhead1.createCell((short) 13).setCellValue("REMARKS");
+									int index1 = 3;
+									int sno1 = 0;
+									String name1 = "";
+									while (rs1.next())
+									{
+									
+										sno1++;
+										HSSFRow row = sheet2.createRow((short) index1);
+										row.createCell((short) 0).setCellValue(sno1);
+										row.createCell((short) 1).setCellValue(rs1.getString(1));
+										row.createCell((short) 2).setCellValue(rs1.getString(2));
+										row.createCell((short) 3).setCellValue(rs1.getString(3));
+										row.createCell((short) 4).setCellValue(rs1.getString(4));
+										row.createCell((short) 5).setCellValue(rs1.getString(5));
+										row.createCell((short) 6).setCellValue(rs1.getString(6));
+										row.createCell((short) 7).setCellValue(rs1.getString(7));
+										row.createCell((short) 8).setCellValue(rs1.getString(8));
+										row.createCell((short) 9).setCellValue(rs1.getString(9));
+										row.createCell((short) 10).setCellValue(rs1.getString(10));
+										row.createCell((short) 11).setCellValue(rs1.getString(11));
+										row.createCell((short) 12).setCellValue(rs1.getString(12));
+										row.createCell((short) 13).setCellValue(rs1.getString(13));
+										
+										
+										
+										/*row.createCell((short) 0).setCellValue(sno);
+										row.createCell((short) 1).setCellValue(rs.getString(2));
+										row.createCell((short) 2).setCellValue(rs.getString(5));
+										row.createCell((short) 3).setCellValue(rs.getString(4));
+										row.createCell((short) 4).setCellValue(rs.getString(5));
+										row.createCell((short) 5).setCellValue(rs.getString(18));
+										row.createCell((short) 6).setCellValue(rs.getString(37));
+										row.createCell((short) 7).setCellValue(rs.getString(27));
+										row.createCell((short) 8).setCellValue(rs.getString(40));
+										row.createCell((short) 9).setCellValue(rs.getString(17));
+										row.createCell((short) 10).setCellValue(rs.getString(4));
+										row.createCell((short) 11).setCellValue(rs.getString(4));*/
+										index1++;
+									}
+									try {
+										   //String strQuery2 = "select orderid, publishername, batch, qc, vald,  upload, u_date from source_book where orderid in ("+sb.toString()+")";
+																																			//"select distinct(orderid), batch, flow, pflow, ordertype, car, qc, vald, upload, u_date, status  from tracking where orderid in ('%"+ inputFile +"%')";
+																																	//String strQuery = "select * from tracking where ORDERID IN ('5807747','5807748','5807752','5807753')";
+																																	//'%"+ inputFile +"%'" ;'2339687','4133026','4205076','4781794','4849295','4942358'
+										ResultSet rs2 = stmt.executeQuery("select orderid, publishername,batch, qc, vald,  upload, u_date,spuid,bookid,status from source_book where orderid in ("+sb.toString()+") GROUP BY ORDERID ORDER BY status ASC");
+										
+										System.out.println("CAR Over Due Report...CAR Allocation Details");
+										//	HSSFWorkbook hwb = new HSSFWorkbook();
+											//HSSFSheet sheet = hwb.createSheet("Summary");
+											//HSSFSheet sheet3 = hwb.createSheet("CAR Allocation");*/
+										    HSSFSheet sheet3 = hwb.createSheet("SCOPUS_TRACKING STATUS");
+										    HSSFSheet my_worksheet2 = hwb.getSheetAt(2); 
+											HSSFRow rowhead2 = sheet3.createRow((short) 2);
+											rowhead2.createCell((short) 0).setCellValue("SNO");
+											rowhead2.createCell((short) 1).setCellValue("ORDER ID");
+											rowhead2.createCell((short) 2).setCellValue("PUBLISHER NAME");
+											rowhead2.createCell((short) 3).setCellValue("BATCH");
+											rowhead2.createCell((short) 4).setCellValue("QC");
+											rowhead2.createCell((short) 5).setCellValue("VALD");
+											rowhead2.createCell((short) 6).setCellValue("UPLOAD");
+											rowhead2.createCell((short) 7).setCellValue("UDATE");
+											rowhead2.createCell((short) 8).setCellValue("SPUID");
+											rowhead2.createCell((short) 9).setCellValue("BOOKID");
+											rowhead2.createCell((short) 10).setCellValue("STATUS");
+											int index2 = 3;
+											int sno2 = 0;
+											String name2 = "";
+											while (rs2.next())
+											{
+												sno2++;
+												HSSFRow row = sheet3.createRow((short) index2);
+												row.createCell((short) 0).setCellValue(sno2);
+												row.createCell((short) 1).setCellValue(rs2.getString(1));
+												row.createCell((short) 2).setCellValue(rs2.getString(2));
+												row.createCell((short) 3).setCellValue(rs2.getString(3));
+												row.createCell((short) 4).setCellValue(rs2.getString(4));
+												row.createCell((short) 5).setCellValue(rs2.getString(5));
+												row.createCell((short) 6).setCellValue(rs2.getString(6));
+												row.createCell((short) 7).setCellValue(rs2.getString(7));
+												row.createCell((short) 8).setCellValue(rs2.getString(8));
+												row.createCell((short) 9).setCellValue(rs2.getString(9));
+												row.createCell((short) 10).setCellValue(rs2.getString(10));
+												
+												index2++;
+											}
+																						
+												/*	try{
+														
+														ResultSet rs33 = stmt.executeQuery("Select orderid,status from orderinfo limit 50");
+																//where orderid not in (select orderid as OD from tracking where orderid in ("+sb.toString()+") group by orderid UNION select orderid from resupply where status='received' and orderid in ("+sb.toString()+") group by orderid UNION select orderid from source_book where orderid in ("+sb.toString()+") group by orderid) and orderid in ("+sb.toString()+")");
+														
+														/*("Select * 
+														from orderinfo where orderid not in (select orderid as OD from tracking where orderid in () group by orderid
+														UNION
+														select orderid from resupply where status='received' and orderid in ("+sb.toString()+")
+														group by orderid 
+														UNION
+														select orderid from source_book where orderid in ("+sb.toString()+") group by orderid)
+														and orderid in ("+sb.toString()+")")*/
+													/*	int rowCount = 0;
+														String s1="";
+														String s2="'";
+														String s3="";
+														String s4="";
+														while(rs33.next()) 
+														{
+												            rowCount = Integer.parseInt(rs33.getString("ORDERID"));
+												            System.out.println(Integer.parseInt(rs33.getString("ORDERID")));
+												            s1 = Integer.parseInt(rs33.getString("ORDERID"))+"',";
+												            s3 =s2+s1;
+												            s4=s4+s3;*/
+												            //System.out.println("Last Character: " +s3.lastIndexOf(',','M'));
+												            
+												            
+												            
+												            /*int rowCount = 0;
+																String s3="";
+																
+																
+																String s4="";
+																while(rs3.next()) {
+														            rowCount = Integer.parseInt(rs3.getString("ORDERID"));
+														            System.out.println(Integer.parseInt(rs3.getString("ORDERID")));
+														            s1 = Integer.parseInt(rs3.getString("ORDERID"))+"',";
+														            s3 =s2+s1;
+														            s4=s4+s3;
+												             * 
+												           /* Pattern p = Pattern.compile(s3.lastIndexOf(","));
+												            Matcher m= p.matcher("");
+												            if(m.find())
+												            {
+												            	String result = m.group();
+												            	System.out.println(""+result);
+												            }*/
+												            
+												           // s3.replace("[0-9]{','}", "LL");
+												           // bw1.write(s3);
+												            /*for(int i = 0; i < s3.size(); i++) {
+												                writer.write(lines.get(i));
+												                if(i < lines.size() - 1) writer.newLine();*/
+												            
+												            
+												          /*  try{
+
+
+												                RandomAccessFile file= new RandomAccessFile("D:\\Logged.txt", "rw");
+												                long length = file.length();
+
+
+												                System.out.println("File Length is ="+file.length());
+
+
+												                //Assume that last line is of 10 char 
+												                file.setLength(length-41);
+
+
+												                System.out.println("Now File Length is ="+file.length());
+												                
+												                file.close();
+												                
+
+
+												                }catch(Exception ex){
+												    
+												     System.out.println("ERROE : "+ex);
+												            }
+												            }
+												            
+												            /*if (s3.endsWith( ","))
+												            {
+												            	s3 = s3.replace ( ',' , '\t');
+												            }
+										                     s3 += "\t";*/
+												            
+												         /*String data1 = new Scanner(new File("D:\\Logged.txt")).useDelimiter("\\Z").next();
+												         // replace all ^ from end of line using (?m) - MULTILINE switch
+												         data1 = data1.replaceAll("$", "123654321654");*/
+												        //data1.readReplace("D:\\Logged.txt","(\\|[a-zA-Z0-9])", "$1\\|"); 
+												         
+												            
+												           
+												           // s1 = s1.replace("$", "'");
+												           
+												           // bw.newLine()
+												        
+														/* s3 = s3.substring(0, s3.length() - 1);
+														 bw1.write(s3);*/
+													/*	}
+														System.out.println(s4);
+														s4=s4.substring(0,s4.lastIndexOf(","));
+											            bw1.write(s4);
+												          
+														 bw1.close();
+												         System.out.println("Count : " + rowCount);
+
+														
+														System.out.println("CAR Over Due Report...ORDER_INFO Details");
+													}
+													catch (Exception ex) 
+													{
+														System.out.println("Database Connection .......: "+ex);
+													}*/
+													try{
+														//String strQuery = "select * from orderinfo where orderid in ("+sb.toString()+")";
+														//ResultSet rs3 = stmt.executeQuery("Select * from orderinfo where orderid not in (select orderid as OD from tracking where orderid in ("+sb.toString()+") group by orderid UNION select orderid from resupply where status='received' and orderid in ("+sb.toString()+") group by orderid UNION select orderid from source_book where orderid in ("+sb.toString()+") group by orderid) and orderid in ("+sb.toString()+")");
+														ResultSet rs3 = stmt.executeQuery("select ORDERID,ordername,flow,DateofProcessing,ordertype,Due_date,status from orderinfo where orderid in ("+sb1.toString()+")GROUP BY ORDERID ORDER BY status ASC");
+														
+														/*("Select * 
+														from orderinfo where orderid not in (select orderid as OD from tracking where orderid in () group by orderid
+														UNION
+														select orderid from resupply where status='received' and orderid in ("+sb.toString()+")
+														group by orderid 
+														UNION
+														select orderid from source_book where orderid in ("+sb.toString()+") group by orderid)
+														and orderid in ("+sb.toString()+")")*/
+														
+														
+														
+														System.out.println("CAR Over Due Report...ORDER_INFO Details");
+														//HSSFWorkbook hwb = new HSSFWorkbook();
+														HSSFSheet sheet4 = hwb.createSheet("ORDER INFO");
+														 HSSFSheet my_worksheet3 = hwb.getSheetAt(3); 
+														HSSFRow rowhead3 = sheet4.createRow((short) 2);
+														rowhead3.createCell((short) 0).setCellValue("SNO");
+														rowhead3.createCell((short) 1).setCellValue("ORDER ID");
+														rowhead3.createCell((short) 2).setCellValue("ORDER NAME");
+														rowhead3.createCell((short) 3).setCellValue("FLOW");
+														rowhead3.createCell((short) 4).setCellValue("DATE OF PROCESSING");
+														rowhead3.createCell((short) 5).setCellValue("ORDER TYPE");
+														rowhead3.createCell((short) 6).setCellValue("DUE DATE");
+														rowhead3.createCell((short) 7).setCellValue("STATUS");
+														int index3 = 3;
+														int sno3 = 0;
+														String name = "";
+														while (rs3.next())
+														{
+															sno3++;
+															HSSFRow rowhead4 = sheet4.createRow((short) index3);
+															rowhead4.createCell((short) 0).setCellValue(sno3);
+															rowhead4.createCell((short) 1).setCellValue(rs3.getString(1));
+															rowhead4.createCell((short) 2).setCellValue(rs3.getString(2));
+															rowhead4.createCell((short) 3).setCellValue(rs3.getString(3));
+															rowhead4.createCell((short) 4).setCellValue(rs3.getString(4));
+															rowhead4.createCell((short) 5).setCellValue(rs3.getString(5));
+															rowhead4.createCell((short) 6).setCellValue(rs3.getString(6));
+															rowhead4.createCell((short) 7).setCellValue(rs3.getString(7));
+															index3++;
+														/*	String id = rs3.getString(1);
+															data.add(" "+id);
+
+																
+															/*writeToFile(data, "H://ORDERINFO.txt");
+															
+															/*rowhead4.createCell((short) 2).setCellValue(rs3.getString(2));
+															rowhead4.createCell((short) 3).setCellValue(rs3.getString(5));
+															rowhead4.createCell((short) 4).setCellValue(rs3.getString(6));
+															rowhead4.createCell((short) 5).setCellValue(rs3.getString(4));
+															rowhead4.createCell((short) 6).setCellValue(rs3.getString(14));
+															rowhead4.createCell((short) 7).setCellValue(rs3.getString(7));*/
+															
+															
+														}
+
+												
+												try{
+													//String strQuery = "select car_orderid, batch, supplierunitid, status from bmcvolissinfo where car_orderid in ('5664448', '5670824', '5734973')("+sb.toString()+")";
+													ResultSet rs4 = stmt.executeQuery("select car_orderid, batch, supplierunitid, status from bmcvolissinfo where car_orderid in ("+sb1.toString()+") ORDER BY status ASC");
+													
+													System.out.println("CAR Over Due Report...FLOW Details");										
+													HSSFSheet sheet5 = hwb.createSheet("FLOW_BMC");
+													HSSFSheet my_worksheet4 = hwb.getSheetAt(4); 
+													HSSFRow rowhead5 = sheet5.createRow((short) 2);
+													//HSSFCell cell = row.createCell((short)1);
+													rowhead5.createCell((short) 0).setCellValue("CAR_ORDERID");
+													rowhead5.createCell((short) 1).setCellValue("BATCH");
+													rowhead5.createCell((short) 2).setCellValue("SUPPLIER_UNITID");
+													rowhead5.createCell((short) 3).setCellValue("STATUS");
+													//rowhead5.createCell((short) 4).setCellValue("");
+													//rowhead5.createCell((short) 5).setCellValue("Total");
+													int index4 = 3;
+													int sno4 = 0;
+													//String name1 = "";
+													while (rs4.next())
+													{
+														sno4++;
+														HSSFRow row = sheet5.createRow((short) index4);
+														row.createCell((short) 0).setCellValue(sno4);
+														row.createCell((short) 1).setCellValue(rs4.getString(1));
+														row.createCell((short) 2).setCellValue(rs4.getString(2));
+														row.createCell((short) 3).setCellValue(rs4.getString(3));
+														row.createCell((short) 4).setCellValue(rs4.getString(4));
+														//rowhead4.createCell((short) 5).setCellValue(rs4.getString(4));
+														index4++;
+													}
+														
+													try{
+														//String strQuery="select orderid, batch, supplierunitid, status from cor where orderid in ('5664448', '5670824', '5734973')";
+														ResultSet rs5 =stmt.executeQuery("select orderid, batch, supplierunitid, status from cor where orderid in ("+sb1.toString()+")ORDER BY status ASC");
+														System.out.println("CAR Over Due Report...FLOW Details");
+														HSSFSheet sheet6 = hwb.createSheet("FLOW_COR");
+														HSSFSheet my_worksheet5 = hwb.getSheetAt(5); 
+														HSSFRow rowhead6 = sheet6.createRow((short) 2);
+														//HSSFCell cell = row.createCell((short)1);
+														rowhead6.createCell((short) 0).setCellValue("SNO");
+														rowhead6.createCell((short) 1).setCellValue("CAR_ORDERID");
+														rowhead6.createCell((short) 2).setCellValue("BATCH");
+														rowhead6.createCell((short) 3).setCellValue("SUPPLIER_UNITID");
+														rowhead6.createCell((short) 4).setCellValue("STATUS");
+														int index5 = 3;
+														int sno5 = 0;
+														//String name1 = "";
+														while (rs5.next())
+														{
+															sno5++;
+															HSSFRow row = sheet6.createRow((short) index5);
+															row.createCell((short) 0).setCellValue(sno5);
+															row.createCell((short) 1).setCellValue(rs5.getString(1));
+															row.createCell((short) 2).setCellValue(rs5.getString(2));
+															row.createCell((short) 3).setCellValue(rs5.getString(3));
+															row.createCell((short) 4).setCellValue(rs5.getString(4));
+															//rowhead4.createCell((short) 5).setCellValue(rs4.getString(4));
+															index5++;
+														}
+														try{
+															ResultSet rs6 =stmt.executeQuery("select Count(orderid) from tracking where orderid in ("+sb.toString()+")");
+															
+														/*	String countno[]={"tracking","source_book","resupply"}; //"COR","VOLISSINFO","OUPVOLISSINFO","SPRVOLISSINFO","ABPELARTICLEINFO","BMCARTICLEINFO","BMCVOLISSINFO","COR","WBPG","ABPEW","AIPEW","AIPBMC","ABPELARTICLEINFO","BOOK_VOLISSINFO","SEGVOLISSINFO","AIPBMJ"
+															for(int j=0;j<countno.length;j++)
+															//String strQuery="select orderid, batch, supplierunitid, status from cor where orderid in ('5664448', '5670824', '5734973')";
+															{
+																ResultSet rs6 =stmt.executeQuery("select Count(distinct orderid) from "+countno[j]+" where orderid in ("+sb.toString()+")");
+															System.out.println("Count Details");
+															while(rs6.next())
+															{
+																//System.out.println("Input String..."+"car_orderid" +rs.getString(1) + "sourceid" + rs.getString(2)  +"status" + rs.getString(3) + "TableName" +tabname[i]);
+																if((rs6.getString(1)!=null)||(rs6.getString(2)!=null))
+																	break; 
+															}*/
+															try{
+																ResultSet rs61 =stmt.executeQuery("select Count(orderid) from resupply where orderid in ("+sb.toString()+")");
+																try{
+																	ResultSet rs62=stmt.executeQuery("Select Count(orderid) from source_book where orderid in ("+sb.toString()+")");
+																 HSSFSheet sheet7 = hwb.createSheet("FINAL REPORT");
+																	HSSFSheet my_worksheet6 = hwb.getSheetAt(6); 
+																	HSSFRow rowhead8 = sheet7.createRow((short) 2);
+																	rowhead8.createCell((short) 0).setCellValue("SNO");
+																	rowhead8.createCell((short) 1).setCellValue("Available in Normal Tracking");
+         								    						rowhead8.createCell((short) 2).setCellValue("Available in Scopus Tracking");
+         								    						rowhead8.createCell((short) 3).setCellValue("Resupply Received Status");
+										/*rowhead8.createCell((short) 4).setCellValue("");
+										rowhead8.createCell((short) 5).setCellValue("Total");*/
+										int index7 = 3;
+										int sno7= 0;
+										//String name1 = "";
+										while (rs6.next())
+										{
+											sno7++;
+											HSSFRow row = sheet7.createRow((short) index7);
+											row.createCell((short) 0).setCellValue(sno7);
+											row.createCell((short) 1).setCellValue(rs6.getString(1));
+										}
+										while (rs61.next())
+										{
+											sno7++;
+											HSSFRow row = sheet7.createRow((short) index7);
+											row.createCell((short) 2).setCellValue(rs61.getString(1));
+										}
+										while (rs62.next())
+										{
+											sno7++;
+											HSSFRow row = sheet7.createRow((short) index7);
+										    row.createCell((short) 3).setCellValue(rs62.getString(1));
+											//row.createCell((short) 4).setCellValue(tabname[i]);
+											//row.createCell((short) 5).setCellValue(rs.getString(16));
+											//row.createCell((short) 4).setCellValue(rs.getString(16));
+											//rowhead4.createCell((short) 5).setCellValue(rs4.getString(4));*/
+											index7++;
+										}
+										
+											
+											
+											
+										try{
+											ResultSet rs0 =stmt.executeQuery("select Count(distinct orderid) from source_book where orderid in ("+sb1.toString()+")");
+											
+										/*	String countno[]={"tracking","source_book","resupply"}; //"COR","VOLISSINFO","OUPVOLISSINFO","SPRVOLISSINFO","ABPELARTICLEINFO","BMCARTICLEINFO","BMCVOLISSINFO","COR","WBPG","ABPEW","AIPEW","AIPBMC","ABPELARTICLEINFO","BOOK_VOLISSINFO","SEGVOLISSINFO","AIPBMJ"
+											for(int j=0;j<countno.length;j++)
+											//String strQuery="select orderid, batch, supplierunitid, status from cor where orderid in ('5664448', '5670824', '5734973')";
+											{
+												ResultSet rs6 =stmt.executeQuery("select Count(distinct orderid) from "+countno[j]+" where orderid in ("+sb.toString()+")");
+											System.out.println("Count Details");
+											while(rs6.next())
+											{
+												//System.out.println("Input String..."+"car_orderid" +rs.getString(1) + "sourceid" + rs.getString(2)  +"status" + rs.getString(3) + "TableName" +tabname[i]);
+												if((rs6.getString(1)!=null)||(rs6.getString(2)!=null))
+													break; 
+											}*/
+											
+																										
+									        HSSFSheet sheet0 = hwb.createSheet("FINAL REPORT");
+											HSSFSheet my_worksheet0 = hwb.getSheetAt(7); 
+											HSSFRow rowhead0 = sheet0.createRow((short) 2);
+											//HSSFCell cell = row.createCell((short)1);
+											//rowhead0.createCell((short) 0).setCellValue("SNO");
+											//rowhead0.createCell((short) 1).setCellValue("Available in Normal Tracking");
+											rowhead0.createCell((short) 2).setCellValue("Available in Scopus Tracking");
+											//rowhead0.createCell((short) 3).setCellValue("Resupply Received Status");
+											/*rowhead8.createCell((short) 4).setCellValue("");
+											rowhead8.createCell((short) 5).setCellValue("Total");*/
+											int index0 = 3;
+											int sno0= 0;
+											//String name1 = "";
+											while (rs0.next())
+											{
+												//sno7++;
+												HSSFRow row = sheet7.createRow((short) index0);
+												//row.createCell((short) 0).setCellValue(sno0);
+												//row.createCell((short) 1).setCellValue(rs6.getString(1));
+												row.createCell((short) 2).setCellValue(rs0.getString(1));
+												//row.createCell((short) 3).setCellValue(countno[j]);
+												//row.createCell((short) 4).setCellValue(tabname[i]);
+												//row.createCell((short) 5).setCellValue(rs.getString(16));
+												//row.createCell((short) 4).setCellValue(rs.getString(16));
+												//rowhead4.createCell((short) 5).setCellValue(rs4.getString(4));*/
+												index0++;
+											}
+											try{
+												ResultSet rs10 =stmt.executeQuery("select Count(distinct orderid) from resupply where orderid in ("+sb1.toString()+")");
+												
+																												/*	String countno[]={"tracking","source_book","resupply"}; //"COR","VOLISSINFO","OUPVOLISSINFO","SPRVOLISSINFO","ABPELARTICLEINFO","BMCARTICLEINFO","BMCVOLISSINFO","COR","WBPG","ABPEW","AIPEW","AIPBMC","ABPELARTICLEINFO","BOOK_VOLISSINFO","SEGVOLISSINFO","AIPBMJ"
+																													for(int j=0;j<countno.length;j++)
+																													//String strQuery="select orderid, batch, supplierunitid, status from cor where orderid in ('5664448', '5670824', '5734973')";
+																													{
+																														ResultSet rs6 =stmt.executeQuery("select Count(distinct orderid) from "+countno[j]+" where orderid in ("+sb.toString()+")");
+																													System.out.println("Count Details");
+																													while(rs6.next())
+																													{
+																														//System.out.println("Input String..."+"car_orderid" +rs.getString(1) + "sourceid" + rs.getString(2)  +"status" + rs.getString(3) + "TableName" +tabname[i]);
+																														if((rs6.getString(1)!=null)||(rs6.getString(2)!=null))
+																															break; 
+																													}*/
+							
+																						
+										        HSSFSheet sheet10 = hwb.createSheet("FINAL REPORT");
+												HSSFSheet my_worksheet10 = hwb.getSheetAt(6); 
+												HSSFRow rowhead10 = sheet10.createRow((short) 2);
+												//HSSFCell cell = row.createCell((short)1);
+												//rowhead0.createCell((short) 0).setCellValue("SNO");
+												//rowhead0.createCell((short) 1).setCellValue("Available in Normal Tracking");
+												//rowhead0.createCell((short) 2).setCellValue("Available in Scopus Tracking");
+												rowhead10.createCell((short) 3).setCellValue("Resupply Received Status");
+												/*rowhead8.createCell((short) 4).setCellValue("");
+												rowhead8.createCell((short) 5).setCellValue("Total");*/
+												int index10 = 3;
+												int sno10= 0;
+												//String name1 = "";
+												while (rs10.next())
+												{
+													//sno7++;
+													HSSFRow row = sheet7.createRow((short) index0);
+													//row.createCell((short) 0).setCellValue(sno0);
+													//row.createCell((short) 1).setCellValue(rs6.getString(1));
+													row.createCell((short) 3).setCellValue(rs10.getString(1));
+													//row.createCell((short) 3).setCellValue(countno[j]);
+													//row.createCell((short) 4).setCellValue(tabname[i]);
+													//row.createCell((short) 5).setCellValue(rs.getString(16));
+													//row.createCell((short) 4).setCellValue(rs.getString(16));
+													//rowhead4.createCell((short) 5).setCellValue(rs4.getString(4));*/
+													index10++;
+												}
+		
+												String tabname[]={"ABPGARTICLEINFO","CEPVOLISSINFO","VOLISSINFO","AIPAPA","APAVOLISSINFO","BPGVOLISSINFO","ELSVOLISSINFO","OUPVOLISSINFO","SPRVOLISSINFO","ABPELARTICLEINFO","BMCARTICLEINFO","BMCVOLISSINFO","WBPG","ABPEW","AIPEW","AIPBMC","ABPELARTICLEINFO","BOOK_VOLISSINFO" ,"SEGVOLISSINFO","AIPBMJ","AIPBMJ"};  // ,"BOOK_VOLISSINFO" //,"SEGVOLISSINFO"//,"AIPBMJ"
+												for(int i=0;i<tabname.length;i++)
+													
+												{
+													String sqlQuery="select car_orderid,sourceid,supplierunitid,batch,status from "+tabname[i]+" where car_orderid in ("+sb1.toString()+")";
+													//select sourceid,batch,status from "+tabname[i]+" where car_orderid in("+sb.toString()+")";//"segarticleinfo",
+													System.out.println(sqlQuery);
+													rs = stmt.executeQuery(sqlQuery);
+													while(rs.next())
+													{
+														System.out.println("Input String..."+"car_orderid" +rs.getString(1) + "sourceid" + rs.getString(2)  +"status" + rs.getString(3) + "TableName" +tabname[i]);
+														if((rs.getString(1)!=null)||(rs.getString(2)!=null))
+															break; 
+													}
+																					
+													HSSFSheet sheet = hwb.createSheet("TABLE_DETAILS");
+													HSSFSheet my_worksheet = hwb.getSheetAt(7); 
+													HSSFRow rowhead = sheet.createRow((short) 2);
+													//HSSFCell cell = row.createCell((short)1);
+													rowhead.createCell((short) 0).setCellValue("S No");
+													rowhead.createCell((short) 1).setCellValue("car_orderid");
+													rowhead.createCell((short) 2).setCellValue("Sourceid");
+													rowhead.createCell((short) 3).setCellValue("SUP_ID");
+													rowhead.createCell((short) 4).setCellValue("BATCH");
+													rowhead.createCell((short) 5).setCellValue("STATUS");
+													rowhead.createCell((short) 6).setCellValue("TABLE NAME");
+													//rowhead.createCell((short) 4).setCellValue("STATUS");
+													//rowhead.createCell((short) 5).setCellValue("STATUS");
+													int index = 3;
+													int sno= 0;
+													//String name1 = "";
+													while (rs.next())
+													{
+														sno++;
+														HSSFRow row = sheet.createRow((short) index);
+														row.createCell((short) 0).setCellValue(sno);
+														row.createCell((short) 1).setCellValue(rs.getString(1));
+														row.createCell((short) 2).setCellValue(rs.getString(2));
+														row.createCell((short) 3).setCellValue(rs.getString(3));
+														row.createCell((short) 4).setCellValue(rs.getString(4));
+														row.createCell((short) 5).setCellValue(rs.getString(5));
+														row.createCell((short) 6).setCellValue(tabname[i]);
+														//row.createCell((short) 5).setCellValue(rs.getString(16));
+														//row.createCell((short) 4).setCellValue(rs.getString(16));
+														//rowhead4.createCell((short) 5).setCellValue(rs4.getString(4));
+														index++;
+													}	
+														/*try{
+																													
+															String tabname[]={"ABPGARTICLEINFO","CEPVOLISSINFO","AIPAPA","APAVOLISSINFO","BPGVOLISSINFO","ELSVOLISSINFO","VOLISSINFO","OUPVOLISSINFO","SPRVOLISSINFO","BMCARTICLEINFO","CAR","BMCVOLISSINFO","WBPG","ABPEW","AIPEW","AIPBMC","ABPELARTICLEINFO","BOOK_VOLISSINFO","SEGVOLISSINFO","AIPBMJ"}; //
+															for(int i=0;i<tabname.length;i++)
+																
+															{
+																String sqlQuery="select car_orderid,sourceid,status from "+tabname[i]+" where car_orderid in ("+sb.toString()+")";//"COR"
+																System.out.println("orderid...."+sb.toString());
+																		//select sourceid,batch,status from "+tabname[i]+" where car_orderid in("+sb.toString()+")";//"segarticleinfo",
+																//System.out.println(sqlQuery);
+																rs = stmt.executeQuery(sqlQuery);
+																while(rs.next())
+																{
+																	System.out.println("Input String..."+"car_orderid" +rs.getString(1) + "sourceid" + rs.getString(2)  +"status" + rs.getString(3) + "TableName" +tabname[i]);
+																	if((rs.getString(1)!=null)||(rs.getString(2)!=null))
+																		break; 
+																}										
+															HSSFSheet sheet8 = hwb.createSheet("TABLE_DETAILS");
+															HSSFSheet my_worksheet7 = hwb.getSheetAt(7); 
+															HSSFRow rowhead7 = sheet8.createRow((short) 2);
+															//HSSFCell cell = row.createCell((short)1);
+															rowhead7.createCell((short) 0).setCellValue("SNo");
+															rowhead7.createCell((short) 1).setCellValue("CarOrderID");
+															rowhead7.createCell((short) 2).setCellValue("Sourceid");
+															rowhead7.createCell((short) 3).setCellValue("STATUS");
+															rowhead7.createCell((short) 4).setCellValue("TABLE NAME");
+															//rowhead.createCell((short) 4).setCellValue("STATUS");
+															//rowhead.createCell((short) 5).setCellValue("STATUS");
+															int index6 = 3;
+															int sno6= 0;
+															//String name1 = "";
+															while (rs.next())
+															{
+																sno6++;
+																HSSFRow row = sheet8.createRow((short) index6);
+																row.createCell((short) 0).setCellValue(sno6);
+																row.createCell((short) 1).setCellValue(rs.getString(1));
+																row.createCell((short) 2).setCellValue(rs.getString(2));
+																row.createCell((short) 3).setCellValue(rs.getString(3));
+																row.createCell((short) 4).setCellValue(tabname[i]);
+																//row.createCell((short) 5).setCellValue(rs.getString(16));
+																//row.createCell((short) 4).setCellValue(rs.getString(16));
+																//rowhead4.createCell((short) 5).setCellValue(rs4.getString(4));
+																index6++;
+															}*/
+													
+															}
+													//rowhead6.createCell((short) 4).setCellValue("STATUS");
+													//rowhead6.createCell((short) 5).setCellValue("Total");
+															
+									
+									String filename = "H://tso1.xls";
+									//response.addProperty("content-disposition", "attachment; filename=" + filename);*/
+									FileOutputStream outputStream = new FileOutputStream("H://tso1.xls");
+
+									hwb.write(outputStream);
+									outputStream.close();
+
+									/*OutputStream os =respo1nse.getPortletOutputStream();
+									hwb.write(os);
+									os.close();*/
+									System.out.println("Orderinfo table generated!...."+sb1.toString());
+									System.out.println("Your CAR_OVERDUE REPORT excel file has been generated!....");
+								}
+														catch (Exception ex) 
+														{
+															System.out.println("error888.......: "+ex);
+														}
+												}
+																catch (Exception ex) 
+																{
+																	System.out.println("error777.......:r "+ex);
+																}
+														}
+										catch (Exception ex) 
+										{
+											System.out.println("error666.......: "+ex);
+										}
+								}
+															catch (Exception ex) 
+															{
+																System.out.println("error55555.......: "+ex);
+															}
+															}
+									catch (Exception ex) 
+									{
+										System.out.println("error4444.......: "+ex);
+									}
+												
+										
+	
+	
+		
+									}	
+											catch (Exception ex) 
+											{
+												System.out.println("error333.......: "+ex);
+											}
+									}	
+									catch (Exception ex) 
+									{
+										System.out.println("error2222.......: "+ex);
+									}
+								}	
+								catch (Exception ex) 
+								{
+									System.out.println("error1111.......: "+ex);
+								}
+				}
+		  	
+	catch (Exception ex) 
+	{
+		System.out.println("error0000.......: "+ex);
+	}
+								}
+	
+		catch (Exception ex) 
+		{
+			System.out.println("error2222.......: "+ex);
+		}
+		}	
+		catch (Exception ex) 
+		{
+			System.out.println("error2222.......: "+ex);
+		}
+		  }
+}
+
+	
+				/*catch (Exception ex) 
+				{
+					System.out.println("error333333.......: "+ex);
+				}
+		  }
+				catch (Exception ex) 
+				{
+					System.out.println("error22222.......: "+ex);
+				}
+	}
+				catch (Exception ex) 
+				{
+					System.out.println("error111111.......: "+ex);
+				}
+}
+	/*private static void writeToFile(java.util.List list, String path) {
+        BufferedWriter out = null;
+        try {
+        	
+        	
+                File file = new File(path);
+                out = new BufferedWriter(new FileWriter(file, true));
+                for (Object s : list) {
+                        out.write((int) s);
+                        out.newLine();
+                        
+                        StringBuilder sb1 = new StringBuilder();
+                        BufferedReader bur = new BufferedReader(new FileReader(path));
+						try {
+         			       
+        			        String line = bur.readLine();
+
+        			        while (line != null) {
+        			            sb1.append(line);
+        			            line = bur.readLine();
+        			            
+        				           System.out.println( sb1.toString());
+        			        }
+        			    }
+        			    finally {
+        			        bur.close();
+        			    }
+
+                }
+                out.close();
+        } catch (IOException e) {
+        }*/
+	
+				
+				
+				
+		
+				  
+				
+								
+
+
+
+
+ 
