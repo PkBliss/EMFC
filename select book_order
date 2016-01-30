@@ -1,0 +1,183 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" %>
+<%@ page   errorPage="error.jsp"  import = "java.io.*" session="true" %>
+<%@ page   import = "java.sql.DriverManager" %>
+<%@ page   import = "java.sql.SQLException" %>
+<%@ page   import = "java.sql.Connection" %>
+<%@ page   import = "java.sql.Driver" %>
+<%@ page   import = "java.sql.Statement" %>
+<%@ page   import = "java.sql.ResultSet" %>
+<%@ page   import=  "java.lang.String" %>
+<%@ page   import = "java.util.*" %>
+<%
+try
+{
+	
+
+System.out.println("DCATS-INSERT-select_book_order.jsp");
+
+		String sql = "";String sql1 = "";String lang = "";String ptype = ""; String otype = "";
+		sql="Select lang from language order by lang";
+		sql1="Select input_type from prod_type order by input_type";
+	
+	Class.forName("sun.jdbc.odbc.JdbcOdbcDriver");
+	//Connection con = DriverManager.getConnection("jdbc:odbc:ELS_DCON_DSN");
+	Connection con = DriverManager.getConnection("jdbc:odbc:oracle_dsn","dcon","els_dcon");
+	Statement smt=con.createStatement();
+	Statement smt1=con.createStatement();
+
+	ResultSet rs=smt.executeQuery(sql);
+	ResultSet rs1=smt1.executeQuery(sql1);
+	
+	
+	
+%>
+<html>
+
+<head>
+
+<title>Insert Book</title>
+ <link href="../style/dcats.css" rel="stylesheet" type="text/css"> 
+ <script language="javascript">
+     window.history.forward(1);
+</script> 
+<SCRIPT LANGUAGE="JavaScript">
+<!--
+	function insertBook() {
+		 if(document.Book.D1.value=="SL"){
+			 alert("Book type required");
+			 document.Book.D1.focus();
+		 }else if(document.Book.D2.value=="SL"){
+			  alert("Book Language required");
+			 document.Book.D2.focus();
+		 }else if(document.Book.D3.value=="SL"){
+			  alert("Production type required");
+			 document.Book.D3.focus();
+		 }else if(document.Book.B1.value==""){
+			 alert("Book Order required");
+			 document.Book.B1.focus();
+		 }else{
+			 document.Book.T1.value="In Progress, Please wait...";
+			document.Book.action="insert_book.jsp";
+			document.Book.submit();
+		 }
+}				
+//-->
+</SCRIPT>
+</head>
+<body bgcolor="#BED9FE" class="main">
+
+<form method="POST" action="--WEBBOT-SELF--" name="Book">
+  
+  <div align="center">
+  <font size="5" color="#0066FF" face="ACaslon BoldOsF">Inserting Book</font>
+  <p>&nbsp;</p>
+  </div>
+    
+  <div align="center">
+    <center>
+    <table border="0" width="38%" height="240" cellspacing="4" cellpadding="3">
+      <tr>
+        <td width="100%" height="77">
+          <div align="center">
+            <center>
+            <table border="1" width="100%" cellspacing="4" cellpadding="4">
+              <tr>
+                <td width="33%" align="center" nowrap><b>Book Type</b></td>
+                <td width="33%" align="center" nowrap><b>Language</b></td>
+                <td width="34%" align="center" nowrap><b>Production Type</b></td>
+              </tr>
+              <tr>
+                <td width="33%" align="center"><select size="1" name="D1" tabindex="1">
+                  <option value="SL">Select...</option>
+				   <option value="FT">FT</option>
+                  <option value="HAT">HAT</option>
+                       <option value="HEAD">HEAD</option>
+                  &nbsp;
+                  </select></td>
+                <td width="33%" align="center"><select size="1" name="D2" tabindex="2">
+                  <option value="SL">Select...</option>
+                 <%
+			while(rs.next())
+			{
+				lang = rs.getString("lang");
+%>
+				<option value="<%=lang%>"><%=lang%></option>
+<%
+
+			}
+%>
+                  </select></td>
+                <td width="34%" align="center"><select size="1" name="D3" tabindex="3">
+                  <option value="SL">Select...</option>
+                  <%
+			while(rs1.next())
+			{
+				ptype = rs1.getString("input_type");
+				
+%>
+				<option value="<%=ptype%>"><%=ptype%></option>
+<%
+
+			}
+%>
+                  </select></td>
+              </tr>
+            </table>
+            </center>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td width="100%" height="48">
+        <table border="1" width="100%" cellspacing="4" cellpadding="4">
+            <tr>
+              <td width="100%" colspan="5" align="center"><b><font size="3"><code>Norms</code></font></b></td>
+            </tr>
+            <tr>
+              <td width="20%" align="center"><font size="3">XML</font></td>
+              <td width="20%" align="center"><font size="3">QC</font></td>
+              <td width="20%" align="center"><font size="3">CORRECTION</font></td>
+              <td width="20%" align="center"><font size="3">WEB PDF</font></td>
+              <td width="20%" align="center"><font size="3">FINAL QC</font></td>
+            </tr>
+            <tr>
+              <td width="20%" align="center"><input type="text" name="xml" size="12" value="0"></td>
+              <td width="20%" align="center"><input type="text" name="qc" size="12" value="0"></td>
+              <td width="20%" align="center"><input type="text" name="corr" size="12" value="0"></td>
+              <td width="20%" align="center"><input type="text" name="web" size="12" value="0"></td>
+              <td width="20%" align="center"><input type="text" name="fqc" size="12" value="0"></td>
+            </tr>
+          </table>
+        
+        </td>
+      </tr>
+      <tr>
+        <td width="100%" height="45">
+          <p align="center"><input type="file" size="75"  value="Browes" name="B1" tabindex="4"></p>
+        </td>
+      </tr>
+      <tr>
+        <td width="100%" height="46">
+          <p align="center"><input type="button" value="   Insert  " name="B2" style="font-weight: bold" tabindex="5" onclick="insertBook()"></p>
+        </td>
+      </tr>
+    </table>
+	
+    </center>
+  </div>
+  <p align="center"><input type="text" readonly name="T1" size="80" style="background-color: #BED9FE; color: #000080; font-weight: bold; text-align: Center; font-size: 12pt; border-style: solid; border-color: #BED9FE" value="Note: Date format should like  < received-date day=08 month=05 year=2008/>"></p>
+  <p>&nbsp;</p>
+  
+</form>
+
+</body>
+
+</html>
+<%
+	con.close();smt.close();
+}catch(SQLException se){
+  			System.out.println("SQL Exception:"+se.getMessage());
+	}catch(ClassNotFoundException cfe){
+			System.out.println("Class:"+cfe.getMessage());
+    }
+%>
