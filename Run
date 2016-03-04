@@ -1,0 +1,58 @@
+package main.java.com.xmltodat.xmltodat;
+
+
+import java.lang.*;
+import java.util.Collections;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.io.*;
+
+public class execrun extends Thread
+{
+  public static void main(String args[]){
+
+	  Set obj= new TreeSet();
+	  obj.add(new member("kp3"));
+	  obj.add(new member("kp1"));
+	  obj.add(new member("kp2"));
+	  
+	  //Collections.sort(obj);
+	 int a=1848;
+	 String b = Integer.toString(a);
+	  
+	  //System.out.println(obj);
+	 	 
+  }
+} 
+
+class member implements Comparable
+{
+	public String name;
+	
+	member(String name)
+	{
+		this.name=name;
+	}
+	public String getName() 
+	{
+		return name;
+	}
+
+	public void setName(String name) 
+	{
+		this.name = name;
+	}
+	 
+	public int compareTo(Object obj)
+	{
+		member sr=(member)obj;
+		return this.name.compareTo(sr.name);
+		
+	}
+	
+	public String toString()
+	{
+		return this.name;
+	}
+}
