@@ -1,0 +1,151 @@
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class Bbb
+{
+
+	//FilesListFromFolder {
+	
+	public static void main(String a[])
+	{
+		
+		String  pflow="";
+		String orderid="";
+		
+		
+		try 
+		{
+			Class.forName("com.mysql.jdbc.Driver").newInstance();
+			java.sql.Connection conn=null;
+			Statement stmt=null;
+			conn = DriverManager.getConnection("jdbc:mysql://10.10.11.234:3306/test","root","p@ssw0rd");
+			System.out.println("Connection Initiated.....");
+			stmt =conn.createStatement();
+			System.out.println("Connected....");
+			ResultSet rs;
+			ResultSet rs1;
+			String user1[] ={"A","B","C","D","E"};
+				
+			File file = new File("H://Failed Folder//File");
+			File[] files = file.listFiles();
+			for(File f: files)
+			{
+				String text = f.getName();
+				//String text ="E~OPSBANK-II~PRODUCTION~EFLOW~CAR~AIP~JANUARY-2016~Batch_05.01.16~6449271~.ini";
+				
+				String patternString1 = "(E~OPSBANK-II~PRODUCTION~EFLOW~CAR~([^~]+)~(.*?)~([0-9]*)~.ini)";
+	            Pattern pattern = Pattern.compile(patternString1);
+		        
+		        Matcher m = pattern.matcher(text);
+		        
+		        //System.out.println("haiiii"+m);
+		        while(m.find())
+		        {
+		        	
+		        	String qwqw= m.group();
+		        	pflow = m.group(2);
+		        	orderid = m.group(4);
+		        	System.out.println("Flow: "+pflow+"\tOrderid: "+orderid);
+		        }
+			}
+			
+			if(pflow!=null)
+			{
+				if(pflow.equals("AIPEW"))
+				{
+					System.out.println("Flow found as :"+pflow);
+				}
+			}
+			
+	    	String minuser=FindMinimumUser.findMinimumUser();
+	    	System.out.println("Minimum User in main class: "+minuser);
+    	
+		}
+		catch (Exception ex) 
+		{
+			ex.printStackTrace();
+		}
+  }
+}
+	        		
+	        	
+	        	/*try{
+	        	String tabname[]={"WBPG","AIPEW","AIPBMC","ABPELARTICLEINFO","AIPBMJ"}; //
+	        	//String tabname[]={"ABPGARTICLEINFO","CEPVOLISSINFO","WILEYVOLISSINFO","AIPAPA","APAVOLISSINFO","BPGVOLISSINFO","ELSVOLISSINFO","VOLISSINFO","OUPVOLISSINFO","SPRVOLISSINFO","BMCARTICLEINFO","BMCVOLISSINFO","WBPG","ABPEW","AIPEW","AIPBMC","ABPELARTICLEINFO","BOOK_VOLISSINFO","SEGVOLISSINFO","AIPBMJ"}; //
+	        	//for(b=0;b<tabname.length;b++)
+				{
+				     rs1 = stmt.executeQuery("select orderid,spuid,sourceid from +tabname[i]+");
+	        	
+
+			//rs1 = stmt.executeQuery("insert select * from tracking where car ="+user+" and c_date='null'");
+			
+			while(rs1.next())
+			{
+				System.out.println(rs1.getInt(1)+"  "+rs1.getString(2)+"  "+rs1.getString(3));  
+				
+			}		                         
+	
+		}
+	        }
+		catch (Exception ex) 
+		{
+				System.out.println("Error in Connection .......: "+ex);
+		}*/
+		
+		//System.out.println(content);
+		//System.out.println("Connection Initiated");
+		//FileOutputStream fop = null;
+		//String e= "ELS";
+		
+		/*try{
+			    //System.out.println("select orderid,spuid,sourceid from tracking_co "); //where car='"+user1+"' and c_date is null
+			rs = stmt.executeQuery("select orderid,spuid,sourceid from tracking_co");
+			//rs1 = stmt.executeQuery("insert select * from tracking where car ="+user+" and c_date='null'");
+			
+			while(rs.next())
+			{
+				System.out.println(rs.getInt(1)+"  "+rs.getString(2)+"  "+rs.getString(3));  
+				
+			}		                         
+	
+		}
+		catch (Exception ex) 
+		{
+		System.out.println("Error in Connection .......: "+ex);
+		}*/
+
+
+			
+
+
+
+/***Part 1**/
+
+
+
+/*try{
+
+//String strQuery = "select distinct(orderid), batch, flow, pflow, ordertype, car, qc, vald, upload, u_date, status  from tracking where orderid in ("+sb.toString()+")";
+rs = stmt.executeQuery("select orderid,flow,CAR from tracking where flow in ('"+e+"') and orderid in ('"+7657288+"')");
+//HSSFWorkbook hwb = new HSSFWorkbook();
+System.out.println("CAR Over Due Report...TRACKING DETAILS");
+				
+while ( rs.next() )  
+{  
+	
+	System.out.println(rs.getInt(1)+"  "+rs.getString(2)+"  "+rs.getString(3));
+	System.out.println(f.getName());
+/*String Orderid = rs.getString(1);
+String Pflow = rs.getString(2);
+String CAR = rs.getString(3);*/
+
+
+//HSSFWorkbook my_xls_workbook = new HSSFWorkbook();
+//String user[] ={"Abinaya","B","C","D","E"};
