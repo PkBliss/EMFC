@@ -1,0 +1,88 @@
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.RandomAccessFile;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
+//import com.sun.java.util.jar.pack.ConstantPool.Index;
+public class FindMinimumUser 
+{
+	public static String findMinimumUser() throws IOException 
+	{
+		String user[] ={"A","B","C","D","E"};
+		String minuser="";
+		try 
+		{
+			Class.forName("com.mysql.jdbc.Driver").newInstance();
+			java.sql.Connection conn=null;
+			Statement stmt=null;
+			conn = DriverManager.getConnection("jdbc:mysql://10.10.11.234:3306/TEST","root","p@ssw0rd");
+			System.out.println("Connection Initiated.....");
+			stmt =conn.createStatement();
+			System.out.println("Connected....");
+			ResultSet rs=null;
+			ResultSet rs1;
+			ArrayList<Integer> countList=new ArrayList<Integer>();														/****** Checking for Count of Each Users********/
+			try{
+				//System.out.println("select orderid,spuid,sourceid from tracking where car='"+user+"' and c_date is null");
+				//rs = stmt.executeQuery("select orderid,spuid,sourceid from tracking where car='"+user+"' and c_date is null");
+				for(int itr=0;itr<user.length;itr++)
+				{
+					System.out.println("SELECT CAR,COUNT(CAR) FROM tracking_co WHERE CAR='"+user[itr]+"'");
+					rs=stmt.executeQuery("SELECT CAR,COUNT(CAR) FROM tracking_co WHERE CAR='"+user[itr]+"'");
+					while(rs.next())
+					{
+						System.out.println("CAR: "+rs.getString(1)+" COUNT: "+rs.getInt(2));
+						countList.add(rs.getInt(2));
+					}
+				}
+				int smallest=countList.get(0);
+				System.out.println("Smallest: "+smallest);
+				int i=1;
+				for(i=1;i<=countList.size();i++)
+				{
+					System.out.println(i+": "+countList.get(i-1));
+					if(countList.get(i-1)<smallest)
+					{
+						smallest=countList.get(i-1);
+						System.out.println("i="+i);
+						minuser=user[i-1];
+						System.out.println("Mininum User: "+minuser);
+						
+					}
+				}
+				System.out.println("Smallest: "+smallest);
+				System.out.println("Mininum User: "+minuser);
+				rs.close();
+				stmt.close();
+				conn.close();
+			}
+			catch(Exception e)
+			{
+				e.printStackTrace();
+			}
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+		}
+		return minuser;
+	}
+}
